@@ -384,127 +384,46 @@ fn is_privileged(env: &Env, caller: &Address) -> bool {
 /// what is stored. If an operator is registered AND this invocation
 /// carries the operator's auth signature, we accept it; otherwise we
 /// fall back to requiring the admin signature.
-fn require_privileged(env: &Env) {
-    let admin = load_admin(env);
-    let op    = load_operator(env);
-
-    if let Some(operator) = op {
-        // An operator is registered.
-        // Soroban's auth context lets us call require_auth on both addresses;
-        // only the one that actually signed will satisfy its check.
-        // We call require_auth on the operator first (it is the common hot
-        // path — BillingCycle as operator calls this on every renewal).
-        // If the operator did NOT sign, its require_auth will trap.
-        // To allow admin as a fallback we cannot call both — so we must
-        // pick the right one. We do this by checking the invoker identity
-        // via env.current_contract_address() comparison is not available,
-        // but Soroban DOES provide `Address::require_auth` as non-trapping
-        // when the address matches the authorised invoker in the auth tree.
-        //
-        // The production-correct pattern: attempt operator auth; if this
-        // call was made by admin instead the operator.require_auth() will
-        // trap, which is expected correct behaviour — the caller must
-        // present exactly one valid identity.
-        //
-        // For dual-identity (either admin OR operator equally valid):
-        // use the `require_auth_for_args` approach with a synthetic arg
-        // set, OR store the invoker address as a function argument and
-        // let the caller self-identify.
-        //
-        // Simplest correct implementation: call require_auth on operator.
-        // If admin needs to call directly, admin passes through as the
-        // signed invoker and operator.require_auth() will fail — so admin
-        // must in that case go through require_auth on admin.
-        //
-        // We resolve this cleanly: try operator path; if caller is admin
-        // (rare override path), admin calls the dedicated admin-only
-        // variants directly using require_admin().
-        operator.require_auth();
-    } else {
-        // No operator registered — admin only.
-        admin.require_auth();
+///
+/// ## Soroban "OR" auth — the only correct pattern
+///
+/// `Address::require_auth()` panics immediately if that address did not sign.
+/// There is no `try_require_auth`. You cannot call require_auth on two addresses
+/// and hope one passes — the first failure traps the whole transaction.
+///
+/// Correct pattern: accept a `caller: Address` parameter, validate it is
+/// privileged (admin or operator), then call `require_auth` on exactly that
+/// address. The caller self-identifies; the contract validates the claim.
+///
+/// Cross-contract calls from BillingCycle:
+///   BillingCycle passes its own contract address as `caller`. Soroban
+///   automatically satisfies `require_auth` for the invoking contract in a
+///   cross-contract call context, so `operator.require_auth()` succeeds.
+///
+/// Direct admin calls from CLI / backend:
+///   Admin passes their wallet address as `caller`. `admin.require_auth()`
+///   succeeds because admin signed the transaction.
+fn require_privileged(env: &Env, caller: &Address) {
+    if !is_privileged(env, caller) {
+        panic_with_error!(env, Error::Unauthorized);
     }
+    caller.require_auth();
 }
 
-/// Requires invoker to be admin OR operator OR `other` address.
+/// Requires the current invoker to be admin, operator, OR `other`.
 ///
-/// Used for functions where the affected party (e.g. the plan owner or
-/// the customer) is also permitted to act on their own data.
+/// Used by: `update_plan`, `deactivate_plan`, `reactivate_plan` (other = plan owner),
+///          `cancel_subscription` (other = customer).
 ///
-/// We identify which identity to require auth from by comparing `other`
-/// against the stored admin and operator. If `other` IS the privileged
-/// address, a single require_auth call suffices. Otherwise we call
-/// require_privileged first; if neither admin nor operator signed, we
-/// fall back to requiring `other`'s auth.
-///
-/// Note: in Soroban you cannot "try" require_auth — any failed auth
-/// check traps immediately. Therefore this function uses the identity-
-/// comparison approach: check who `other` is relative to stored values
-/// and route to exactly one require_auth call.
-fn require_privileged_or(env: &Env, other: &Address) {
-    let admin = load_admin(env);
-    let op    = load_operator(env);
-
-    // Case 1: `other` IS the operator (e.g. plan owner == operator address).
-    // One require_auth on operator covers both intents.
-    if let Some(ref operator) = op {
-        if other == operator {
-            operator.require_auth();
-            return;
-        }
-    }
-
-    // Case 2: `other` IS the admin. Require admin auth.
-    if other == &admin {
-        admin.require_auth();
-        return;
-    }
-
-    // Case 3: `other` is an independent address (e.g. a plan owner or customer).
-    // The caller must be EITHER privileged (admin/operator) OR `other`.
-    // We cannot know which one signed without trapping, so we accept `other`
-    // as the assumed signer. If the caller is actually admin or operator, they
-    // should have their address match `other`, or use the admin-only function
-    // variants (create_plan_for, etc.) instead.
-    //
-    // For the specific cases in this contract:
-    //  - update_plan / deactivate_plan / reactivate_plan: `other` = plan.owner
-    //    A plan owner can act on their own plan. Admin/operator use the
-    //    admin-auth path by calling through the operator (BillingCycle).
-    //  - cancel_subscription: `other` = customer
-    //    A customer can cancel their own subscription directly.
-    //
-    // In all these cases the operator (BillingCycle) is the privileged caller,
-    // and it is NOT `other`. So we require operator auth when an operator exists,
-    // otherwise fall back to admin, otherwise require `other`.
-    if let Some(operator) = op {
-        // Privileged path: operator is the expected caller for admin actions.
-        // If the actual signer is `other` (plan owner / customer acting directly),
-        // operator.require_auth() will trap — but that is correct: direct user
-        // actions should sign as themselves, and the operator should only call
-        // this path when it IS the signer.
-        //
-        // To support BOTH paths, we compare: if the invoker is likely `other`
-        // (i.e. this is a direct user action, not a BillingCycle action),
-        // we cannot know without trapping. The safe approach used by most
-        // Soroban contracts is to let the caller provide their address as a
-        // function argument and call require_auth on that argument.
-        //
-        // Our functions already do this (e.g. cancel_subscription takes
-        // `customer: Address`). So `other` here IS the caller-provided
-        // address, and we call require_auth on it. The transaction will fail
-        // if the provided address did not sign.
-        let _ = operator; // operator registered but `other` is the identified signer
-        other.require_auth();
+/// Same self-identification pattern: the caller passes their own address.
+/// We check if caller is privileged OR equals `other`, then require their auth.
+fn require_privileged_or(env: &Env, caller: &Address, other: &Address) {
+    if is_privileged(env, caller) || caller == other {
+        caller.require_auth();
     } else {
-        // No operator — require either admin or `other`.
-        // Admin path: if admin is calling, admin must pass themselves as `other`,
-        // which is handled by Case 2 above. Reaching here means the caller is
-        // neither admin nor operator — require `other`'s auth.
-        other.require_auth();
+        panic_with_error!(env, Error::Unauthorized);
     }
 }
-
 // ─── Storage Helpers ──────────────────────────────────────────────────────────
 
 fn load_plan(env: &Env, plan_id: u64) -> PlanConfig {
@@ -721,6 +640,7 @@ impl SubscriptionRegistry {
     /// developer's wallet is recorded as owner.
     pub fn create_plan_for(
         env: Env,
+        caller: Address,
         owner: Address,
         name: String,
         price_usdc: i128,
@@ -729,7 +649,7 @@ impl SubscriptionRegistry {
         usage_limit: u64,
         features: Vec<String>,
     ) -> u64 {
-        require_privileged(&env);
+        require_privileged(&env, &caller);
         validate_plan_inputs(&env, &name, price_usdc, interval_seconds, &features);
 
         let plan_id = next_plan_id(&env);
@@ -763,6 +683,7 @@ impl SubscriptionRegistry {
     /// `name` and `features` changes take effect immediately.
     pub fn update_plan(
         env: Env,
+        caller: Address,
         plan_id: u64,
         name: String,
         price_usdc: i128,
@@ -771,7 +692,7 @@ impl SubscriptionRegistry {
     ) {
         let mut plan = load_plan(&env, plan_id);
         // Admin, operator, OR the plan's own owner may update
-        require_privileged_or(&env, &plan.owner);
+        require_privileged_or(&env, &caller, &plan.owner);
         validate_plan_inputs(&env, &name, price_usdc, plan.interval_seconds, &features);
 
         plan.name        = name;
@@ -785,9 +706,9 @@ impl SubscriptionRegistry {
 
     /// Deactivates a plan so no new subscriptions can be created on it.
     /// Existing subscriptions continue unaffected.
-    pub fn deactivate_plan(env: Env, plan_id: u64) {
+    pub fn deactivate_plan(env: Env, caller: Address, plan_id: u64) {
         let mut plan = load_plan(&env, plan_id);
-        require_privileged_or(&env, &plan.owner);
+        require_privileged_or(&env, &caller, &plan.owner);
 
         if !plan.active {
             panic_with_error!(&env, Error::AlreadyInactive);
@@ -799,9 +720,9 @@ impl SubscriptionRegistry {
     }
 
     /// Reactivates a previously deactivated plan.
-    pub fn reactivate_plan(env: Env, plan_id: u64) {
+    pub fn reactivate_plan(env: Env, caller: Address, plan_id: u64) {
         let mut plan = load_plan(&env, plan_id);
-        require_privileged_or(&env, &plan.owner);
+        require_privileged_or(&env, &caller, &plan.owner);
 
         if plan.active {
             panic_with_error!(&env, Error::AlreadyActive);
@@ -851,10 +772,11 @@ impl SubscriptionRegistry {
     /// - `AlreadySubscribed` — customer has a non-terminal subscription
     pub fn create_subscription(
         env: Env,
+        caller: Address,
         customer: Address,
         plan_id: u64,
     ) -> SubscriptionRecord {
-        require_privileged(&env);
+        require_privileged(&env, &caller);
 
         let plan = load_plan(&env, plan_id);
 
@@ -900,12 +822,8 @@ impl SubscriptionRegistry {
     ///
     /// Called exclusively by BillingCycle (operator) or admin.
     /// Panics with `InvalidTransition` for disallowed state changes.
-    pub fn update_status(
-        env: Env,
-        customer: Address,
-        new_status: SubStatus,
-    ) {
-        require_privileged(&env);
+    pub fn update_status(env: Env, caller: Address, customer: Address, new_status: SubStatus) {
+        require_privileged(&env, &caller);
 
         let mut sub = load_subscription(&env, &customer);
         let old_status = sub.status.clone();
@@ -933,11 +851,12 @@ impl SubscriptionRegistry {
     /// - Period timestamps are supplied by BillingCycle (which owns timing math).
     pub fn renew_subscription(
         env: Env,
+        caller: Address,
         customer: Address,
         new_period_start: u64,
         new_period_end: u64,
     ) {
-        require_privileged(&env);
+        require_privileged(&env, &caller);
 
         if new_period_end <= new_period_start {
             panic_with_error!(&env, Error::InvalidPeriod);
@@ -974,8 +893,8 @@ impl SubscriptionRegistry {
     ///   No on-chain refund — handle via EscrowVault if needed.
     ///
     /// Auth: admin, operator, or the customer themselves.
-    pub fn cancel_subscription(env: Env, customer: Address, immediate: bool) {
-        require_privileged_or(&env, &customer);
+    pub fn cancel_subscription(env: Env, caller: Address, customer: Address, immediate: bool) {
+        require_privileged_or(&env, &caller, &customer);
 
         let mut sub = load_subscription(&env, &customer);
 
@@ -1146,8 +1065,8 @@ impl SubscriptionRegistry {
     ///
     /// # Returns
     /// The new `usage_current` total for this billing period.
-    pub fn increment_usage(env: Env, customer: Address, units: u64) -> u64 {
-        require_privileged(&env);
+    pub fn increment_usage(env: Env, caller: Address, customer: Address, units: u64) -> u64 {
+        require_privileged(&env, &caller);
 
         if units == 0 {
             panic_with_error!(&env, Error::ZeroUnits);
@@ -1191,9 +1110,10 @@ impl SubscriptionRegistry {
     /// Use `UsageBatchEntry { customer, units }` instead.
     pub fn increment_usage_batch(
         env: Env,
+        caller: Address,
         entries: Vec<UsageBatchEntry>,
     ) -> u32 {
-        require_privileged(&env);
+        require_privileged(&env, &caller);
 
         // Enforce batch size limit to stay within Soroban instruction budget
         if entries.len() > 50 {

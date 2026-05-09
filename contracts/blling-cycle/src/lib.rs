@@ -350,7 +350,12 @@ fn registry_create_subscription(
     let _: registry::SubscriptionRecord = env.invoke_contract(
         registry,
         &Symbol::new(env, "create_subscription"),
-        soroban_sdk::vec![env, customer.into_val(env), plan_id.into_val(env)],
+        soroban_sdk::vec![
+            env,
+            env.current_contract_address().into_val(env), // caller = BillingCycle (operator)
+            customer.into_val(env),
+            plan_id.into_val(env),
+        ],
     );
 }
 
@@ -363,7 +368,12 @@ fn registry_update_status(
     let _: () = env.invoke_contract(
         registry,
         &Symbol::new(env, "update_status"),
-        soroban_sdk::vec![env, customer.into_val(env), status.into_val(env)],
+        soroban_sdk::vec![
+            env,
+            env.current_contract_address().into_val(env), // caller = BillingCycle (operator)
+            customer.into_val(env),
+            status.into_val(env),
+        ],
     );
 }
 
@@ -379,6 +389,7 @@ fn registry_renew_subscription(
         &Symbol::new(env, "renew_subscription"),
         soroban_sdk::vec![
             env,
+            env.current_contract_address().into_val(env), // caller = BillingCycle (operator)
             customer.into_val(env),
             new_period_start.into_val(env),
             new_period_end.into_val(env),

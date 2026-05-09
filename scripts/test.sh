@@ -61,8 +61,8 @@ SOURCE="mywallet"
 CUSTOMER_SOURCE="deployer"
 
 # Manually set contract IDs
-REGISTRY_CONTRACT_ID="CDPTPGXA55UC25HSRVRBMQIFZJL7FGB3JJUPWYJPMRZVZVC5ZD4PZMX3"
-BILLING_CONTRACT_ID="CAJN2VD2NOEV7EYDVL7WOXIFLUXNZOAGZXC5E6SG5WHGAQLH3VDZGPFI"
+REGISTRY_CONTRACT_ID="CCKZ2MGDAQKFIIZCBD3SJUGNBV2RSQCNIUYQT5SPFAZFK27KGGPKIT6V"
+BILLING_CONTRACT_ID="CBXPNSHCJH7IKJDAXEGXXLJQOCZB6ZB3VIJGR3NPXCBNOZBI3ZCV4WDS"
 
 # Validate
 if [ -z "$REGISTRY_CONTRACT_ID" ] || [ -z "$BILLING_CONTRACT_ID" ]; then
@@ -182,7 +182,9 @@ assert_not_contains() {
 assert_success() {
   local label="$1"
   local output="$2"
-  if echo "$output" | grep -qi "error\|failed\|panic"; then
+  # Match the CLI's actual error indicators (❌, "error:") rather than bare
+  # words like "failed" which appear in JSON field names (grace_retry_failed).
+  if echo "$output" | grep -q "❌\|error:"; then
     fail "$label (unexpected error: $output)"
   else
     pass "$label"
@@ -326,6 +328,7 @@ section "4 — Plan updates"
 
 step "4.1" "update_plan: change name and usage_limit"
 OUT=$(invoke_registry update_plan \
+  --caller "$ADMIN_ADDRESS" \
   --plan_id "$PAID_PLAN_ID" \
   --name "Pro Monthly v2" \
   --price_usdc 50000000 \
@@ -421,6 +424,7 @@ section "7 — Trial plan subscription"
 
 step "7.1" "Cancel alice's free plan subscription before trial test"
 OUT=$(invoke_registry_as $CUSTOMER_SOURCE cancel_subscription \
+  --caller "$CUSTOMER_ADDRESS" \
   --customer "$CUSTOMER_ADDRESS" \
   --immediate true 2>&1 || true)
 assert_success "cancel free plan before trial test" "$OUT"
@@ -445,6 +449,7 @@ assert_contains "api_access granted during trial" "$OUT" "true"
 
 step "7.5" "Cancel trial and re-subscribe to free plan for remaining tests"
 invoke_registry_as $CUSTOMER_SOURCE cancel_subscription \
+  --caller "$CUSTOMER_ADDRESS" \
   --customer "$CUSTOMER_ADDRESS" \
   --immediate true > /dev/null 2>&1 || true
 OUT=$(invoke_billing_as $CUSTOMER_SOURCE initiate_subscription \
@@ -458,8 +463,11 @@ assert_success "re-subscribe to free plan after trial" "$OUT"
 
 section "8 — Entitlement checks"
 
-# Define a fake address used throughout sections 8 and 13
-FAKE_ADDR="GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN"
+# Define a fake address used throughout sections 8 and 13.
+# We use ADMIN_ADDRESS here because the Stellar CLI resolves raw addresses
+# against the local keystore. At this point in the test, admin has no
+# subscription, so it correctly represents an "unsubscribed wallet".
+FAKE_ADDR="$ADMIN_ADDRESS"
 
 step "8.1" "check_entitlement for api_access (should be true)"
 OUT=$(invoke_registry check_entitlement \
@@ -503,13 +511,14 @@ section "9 — Usage metering"
 
 step "9.1" "increment_usage by 100"
 OUT=$(invoke_registry increment_usage \
+  --caller "$ADMIN_ADDRESS" \
   --customer "$CUSTOMER_ADDRESS" \
   --units 100 2>&1 || true)
-# u64 return value is a plain number in Stellar CLI output
 assert_contains "increment_usage returns 100" "$OUT" "100"
 
 step "9.2" "increment_usage by 250 (should be 350 total)"
 OUT=$(invoke_registry increment_usage \
+  --caller "$ADMIN_ADDRESS" \
   --customer "$CUSTOMER_ADDRESS" \
   --units 250 2>&1 || true)
 assert_contains "total usage is 350" "$OUT" "350"
@@ -522,12 +531,14 @@ assert_contains "usage_current is 350" "$OUT" "350"
 
 step "9.4" "increment_usage with 0 units should be rejected"
 OUT=$(invoke_registry increment_usage \
+  --caller "$ADMIN_ADDRESS" \
   --customer "$CUSTOMER_ADDRESS" \
   --units 0 2>&1 || true)
 assert_error "zero units rejected (ZeroUnits)" "$OUT"
 
 step "9.5" "increment_usage_batch — 1 entry"
 OUT=$(invoke_registry increment_usage_batch \
+  --caller "$ADMIN_ADDRESS" \
   --entries '[{"customer":"'"$CUSTOMER_ADDRESS"'","units":50}]' 2>&1 || true)
 assert_success "increment_usage_batch succeeds" "$OUT"
 assert_contains "batch returned 1 success" "$OUT" "1"
@@ -546,6 +557,7 @@ section "10 — Subscription cancellation"
 
 step "10.1" "cancel_subscription end-of-period (alice cancels herself)"
 OUT=$(invoke_registry_as $CUSTOMER_SOURCE cancel_subscription \
+  --caller "$CUSTOMER_ADDRESS" \
   --customer "$CUSTOMER_ADDRESS" \
   --immediate false 2>&1 || true)
 assert_success "cancel_subscription (end of period)" "$OUT"
@@ -562,12 +574,14 @@ assert_contains "still entitled after schedule-cancel" "$OUT" "true"
 
 step "10.4" "re-setting cancel_at_period_end is idempotent"
 OUT=$(invoke_registry_as $CUSTOMER_SOURCE cancel_subscription \
+  --caller "$CUSTOMER_ADDRESS" \
   --customer "$CUSTOMER_ADDRESS" \
   --immediate false 2>&1 || true)
 assert_success "re-setting cancel_at_period_end is accepted" "$OUT"
 
 step "10.5" "immediate cancel"
 OUT=$(invoke_registry_as $CUSTOMER_SOURCE cancel_subscription \
+  --caller "$CUSTOMER_ADDRESS" \
   --customer "$CUSTOMER_ADDRESS" \
   --immediate true 2>&1 || true)
 assert_success "cancel_subscription (immediate)" "$OUT"
@@ -588,6 +602,7 @@ assert_contains "is_subscribed = false" "$OUT" "false"
 
 step "10.9" "triple cancel should be rejected (AlreadyCancelled)"
 OUT=$(invoke_registry_as $CUSTOMER_SOURCE cancel_subscription \
+  --caller "$CUSTOMER_ADDRESS" \
   --customer "$CUSTOMER_ADDRESS" \
   --immediate true 2>&1 || true)
 assert_error "cancel on cancelled sub rejected" "$OUT"
@@ -623,7 +638,7 @@ assert_contains "entitlement restored after re-sub" "$OUT" "true"
 section "12 — Plan deactivation"
 
 step "12.1" "deactivate_plan on paid plan"
-OUT=$(invoke_registry deactivate_plan --plan_id "$PAID_PLAN_ID" 2>&1 || true)
+OUT=$(invoke_registry deactivate_plan --caller "$ADMIN_ADDRESS" --plan_id "$PAID_PLAN_ID" 2>&1 || true)
 assert_success "deactivate_plan" "$OUT"
 
 step "12.2" "get_plan shows active=false"
@@ -632,12 +647,14 @@ assert_contains "plan is now inactive" "$OUT" '"active":false'
 
 step "12.3" "double deactivate should be rejected (AlreadyInactive)"
 OUT=$(invoke_registry deactivate_plan \
+  --caller "$ADMIN_ADDRESS" \
   --plan_id "$PAID_PLAN_ID" 2>&1 || true)
 assert_error "double deactivate rejected" "$OUT"
 
 step "12.4" "new subscription on deactivated plan rejected (PlanInactive)"
 # Cancel alice's current sub first so we can attempt a fresh subscribe
 invoke_registry_as $CUSTOMER_SOURCE cancel_subscription \
+  --caller "$CUSTOMER_ADDRESS" \
   --customer "$CUSTOMER_ADDRESS" \
   --immediate true > /dev/null 2>&1 || true
 
@@ -647,7 +664,7 @@ OUT=$(invoke_billing_as $CUSTOMER_SOURCE initiate_subscription \
 assert_error "subscribe on inactive plan rejected" "$OUT"
 
 step "12.5" "reactivate_plan"
-OUT=$(invoke_registry reactivate_plan --plan_id "$PAID_PLAN_ID" 2>&1 || true)
+OUT=$(invoke_registry reactivate_plan --caller "$ADMIN_ADDRESS" --plan_id "$PAID_PLAN_ID" 2>&1 || true)
 assert_success "reactivate_plan" "$OUT"
 
 step "12.6" "get_plan shows active=true again"
@@ -656,6 +673,7 @@ assert_contains "plan is active again" "$OUT" '"active":true'
 
 step "12.7" "double reactivate should be rejected (AlreadyActive)"
 OUT=$(invoke_registry reactivate_plan \
+  --caller "$ADMIN_ADDRESS" \
   --plan_id "$PAID_PLAN_ID" 2>&1 || true)
 assert_error "double reactivate rejected" "$OUT"
 
