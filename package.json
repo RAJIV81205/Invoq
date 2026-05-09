@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "compile": "stellar contract build",
-    "deploy": "bash scripts/deploy.sh"
+    "deploy": "bash scripts/deploy.sh",
+    "test" : "bash scripts/test.sh"
   },
   "dependencies": {
     "next": "16.2.6",
