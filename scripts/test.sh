@@ -21,7 +21,7 @@
 #   13. BillingCycle admin functions
 #   14. Operator management
 #   15. Admin transfer
-#   16. USDC / paid plan integration note
+#   16. USDC paid plan integration (approve → subscribe → verify payment → cancel)
 #
 # USAGE
 # ─────
@@ -216,6 +216,7 @@ echo "  Admin:           $ADMIN_ADDRESS  ($SOURCE)"
 echo "  Customer:        $CUSTOMER_ADDRESS  ($CUSTOMER_SOURCE)"
 echo "  Registry:        $REGISTRY_CONTRACT_ID"
 echo "  BillingCycle:    $BILLING_CONTRACT_ID"
+echo "  USDC SAC:        CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
 echo ""
 
 ########################################
@@ -775,33 +776,149 @@ assert_contains "admin unchanged after self-transfer" "$OUT" "$ADMIN_ADDRESS"
 # TEST 16 — USDC INTEGRATION NOTE
 ########################################
 
-section "16 — USDC / paid plan integration"
+########################################
+# TEST 16 — USDC / PAID PLAN INTEGRATION
+########################################
 
-echo "  Note: paid plan subscription tests require testnet USDC."
-echo ""
-echo "  To test paid flows:"
-echo "   1. Get testnet USDC from: https://usdcfaucet.circle.com"
-echo "   2. Approve BillingCycle as spender:"
-echo "      stellar contract invoke \\"
-echo "        --id $USDC_SAC \\"
-echo "        --source-account $SOURCE \\"
-echo "        --network testnet \\"
-echo "        -- approve \\"
-echo "        --from $ADMIN_ADDRESS \\"
-echo "        --spender $BILLING_CONTRACT_ID \\"
-echo "        --amount 500000000 \\"
-echo "        --expiration_ledger 999999999"
-echo ""
-echo "   3. Subscribe to the paid plan:"
-echo "      stellar contract invoke \\"
-echo "        --id $BILLING_CONTRACT_ID \\"
-echo "        --source-account $SOURCE \\"
-echo "        --network testnet \\"
-echo "        -- initiate_subscription \\"
-echo "        --customer $ADMIN_ADDRESS \\"
-echo "        --plan_id $PAID_PLAN_ID"
-echo ""
-skip "Paid plan USDC flow skipped — requires testnet USDC balance"
+section "16 — USDC paid plan integration"
+
+# Testnet USDC SAC (Circle's official testnet asset contract)
+USDC_SAC="CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+
+# Paid plan costs 50000000 stroops = 5 USDC per month.
+# Approve enough for 2 months so the allowance covers the initial charge.
+APPROVE_AMOUNT=100000000
+
+# Expiration ledger: current ledger + ~30 days worth of ledgers.
+# Testnet closes ~1 ledger/5s → 30 days = 518400 ledgers.
+# We fetch the current ledger sequence via the Horizon API.
+CURRENT_LEDGER=$(curl -sf "https://horizon-testnet.stellar.org/ledgers?order=desc&limit=1" \
+  2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['_embedded']['records'][0]['sequence'])" \
+  2>/dev/null || echo "0")
+if [ -z "$CURRENT_LEDGER" ] || [ "$CURRENT_LEDGER" = "0" ]; then
+  CURRENT_LEDGER=2500000
+fi
+EXPIRY_LEDGER=$(( CURRENT_LEDGER + 518400 ))
+echo "  → Current ledger: $CURRENT_LEDGER  |  Expiry ledger: $EXPIRY_LEDGER"
+
+step "16.1" "Check alice's USDC balance before subscribing"
+OUT=$(stellar contract invoke \
+  --id "$USDC_SAC" \
+  --source-account $CUSTOMER_SOURCE \
+  --network $NETWORK \
+  -- balance \
+  --id "$CUSTOMER_ADDRESS" 2>&1 || true)
+assert_success "USDC balance query succeeds" "$OUT"
+echo "  → Alice USDC balance: $(echo "$OUT" | grep -o '"[0-9]*"' | tr -d '"')"
+
+step "16.2" "Alice approves BillingCycle to spend her USDC"
+# The customer must pre-approve BillingCycle as a spender before subscribing.
+# BillingCycle calls transfer_from(spender=itself, from=customer, to=plan_owner).
+OUT=$(stellar contract invoke \
+  --id "$USDC_SAC" \
+  --source-account $CUSTOMER_SOURCE \
+  --network $NETWORK \
+  -- approve \
+  --from "$CUSTOMER_ADDRESS" \
+  --spender "$BILLING_CONTRACT_ID" \
+  --amount $APPROVE_AMOUNT \
+  --expiration_ledger $EXPIRY_LEDGER 2>&1 || true)
+assert_success "USDC approve succeeds" "$OUT"
+
+step "16.3" "Verify allowance is set"
+OUT=$(stellar contract invoke \
+  --id "$USDC_SAC" \
+  --source-account $CUSTOMER_SOURCE \
+  --network $NETWORK \
+  -- allowance \
+  --from "$CUSTOMER_ADDRESS" \
+  --spender "$BILLING_CONTRACT_ID" 2>&1 || true)
+assert_contains "allowance is set" "$OUT" "$APPROVE_AMOUNT"
+
+step "16.4" "Alice subscribes to the paid plan (5 USDC charged immediately)"
+# Ensure alice has no active subscription before subscribing
+invoke_registry_as $CUSTOMER_SOURCE cancel_subscription \
+  --caller "$CUSTOMER_ADDRESS" \
+  --customer "$CUSTOMER_ADDRESS" \
+  --immediate true > /dev/null 2>&1 || true
+
+OUT=$(invoke_billing_as $CUSTOMER_SOURCE initiate_subscription \
+  --customer "$CUSTOMER_ADDRESS" \
+  --plan_id "$PAID_PLAN_ID" 2>&1 || true)
+assert_success "paid plan subscription succeeds" "$OUT"
+
+step "16.5" "Subscription record shows Active status on paid plan"
+OUT=$(invoke_registry get_subscription --customer "$CUSTOMER_ADDRESS" 2>&1 || true)
+assert_contains "subscription is Active"       "$OUT" "Active"
+assert_contains "subscription is on paid plan" "$OUT" "$PAID_PLAN_ID"
+
+step "16.6" "Entitlement granted for paid features (api_access)"
+OUT=$(invoke_registry check_entitlement \
+  --customer "$CUSTOMER_ADDRESS" \
+  --feature "api_access" 2>&1 || true)
+assert_contains "api_access granted on paid plan" "$OUT" "true"
+
+step "16.7" "Entitlement granted for webhooks (paid plan feature)"
+OUT=$(invoke_registry check_entitlement \
+  --customer "$CUSTOMER_ADDRESS" \
+  --feature "webhooks" 2>&1 || true)
+assert_contains "webhooks granted on paid plan" "$OUT" "true"
+
+step "16.8" "Alice's USDC balance decreased by 5 USDC after subscription"
+OUT=$(stellar contract invoke \
+  --id "$USDC_SAC" \
+  --source-account $CUSTOMER_SOURCE \
+  --network $NETWORK \
+  -- balance \
+  --id "$CUSTOMER_ADDRESS" 2>&1 || true)
+assert_success "USDC balance query after subscription succeeds" "$OUT"
+echo "  → Alice USDC balance after subscription: $(echo "$OUT" | grep -o '"[0-9]*"' | tr -d '"')"
+
+step "16.9" "Plan owner (admin) received the 5 USDC payment"
+OUT=$(stellar contract invoke \
+  --id "$USDC_SAC" \
+  --source-account $SOURCE \
+  --network $NETWORK \
+  -- balance \
+  --id "$ADMIN_ADDRESS" 2>&1 || true)
+assert_success "Admin USDC balance query succeeds" "$OUT"
+echo "  → Admin USDC balance after receiving payment: $(echo "$OUT" | grep -o '"[0-9]*"' | tr -d '"')"
+
+step "16.10" "Duplicate paid subscription is rejected"
+OUT=$(invoke_billing_as $CUSTOMER_SOURCE initiate_subscription \
+  --customer "$CUSTOMER_ADDRESS" \
+  --plan_id "$PAID_PLAN_ID" 2>&1 || true)
+assert_error "duplicate paid subscription rejected" "$OUT"
+
+step "16.11" "Cancel paid subscription (immediate)"
+OUT=$(invoke_registry_as $CUSTOMER_SOURCE cancel_subscription \
+  --caller "$CUSTOMER_ADDRESS" \
+  --customer "$CUSTOMER_ADDRESS" \
+  --immediate true 2>&1 || true)
+assert_success "cancel paid subscription" "$OUT"
+
+step "16.12" "Entitlement revoked after cancellation"
+OUT=$(invoke_registry check_entitlement \
+  --customer "$CUSTOMER_ADDRESS" \
+  --feature "api_access" 2>&1 || true)
+assert_contains "not entitled after paid plan cancel" "$OUT" "false"
+
+step "16.13" "Subscribe with zero allowance is rejected (PaymentFailed)"
+# Revoke allowance by setting it to 0
+stellar contract invoke \
+  --id "$USDC_SAC" \
+  --source-account $CUSTOMER_SOURCE \
+  --network $NETWORK \
+  -- approve \
+  --from "$CUSTOMER_ADDRESS" \
+  --spender "$BILLING_CONTRACT_ID" \
+  --amount 0 \
+  --expiration_ledger $EXPIRY_LEDGER > /dev/null 2>&1 || true
+
+OUT=$(invoke_billing_as $CUSTOMER_SOURCE initiate_subscription \
+  --customer "$CUSTOMER_ADDRESS" \
+  --plan_id "$PAID_PLAN_ID" 2>&1 || true)
+assert_error "subscription without allowance rejected (PaymentFailed)" "$OUT"
 
 ########################################
 # SUMMARY
