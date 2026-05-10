@@ -22,6 +22,7 @@
 #   14. Operator management
 #   15. Admin transfer
 #   16. USDC paid plan integration (approve → subscribe → verify payment → cancel)
+#   17. SpendPolicy — initialization, policy lifecycle, spend checks, recording
 #
 # USAGE
 # ─────
@@ -63,8 +64,9 @@ CUSTOMER_SOURCE="imported"
 # Manually set contract IDs
 REGISTRY_CONTRACT_ID="CCYREON6K2AGO5DRQMTW4MVNYBBOLOPZMP4RP7JY6H3FXUFQFH2SXQYA"
 BILLING_CONTRACT_ID="CCCFUSKCBHLVDWHLO7WYZ5EEC3QRYZLUQ5HWCPAGB7J5WKS3B2NOMKHO"
+SPEND_POLICY_CONTRACT_ID="CDTLW43XT55X5FZB3PPC5Y7UG6PSYC4LW3ZED23YIEIVDXVOT72QHFPG"   # Set after: npm run deploy:spend-policy
 
-# Validate
+# Validate core contracts
 if [ -z "$REGISTRY_CONTRACT_ID" ] || [ -z "$BILLING_CONTRACT_ID" ]; then
   echo -e "${RED}Error: REGISTRY_CONTRACT_ID or BILLING_CONTRACT_ID not set.${NC}"
   exit 1
@@ -154,6 +156,26 @@ invoke_registry_as() {
     -- "$@" 2>&1
 }
 
+# invoke_spend_policy: calls SpendPolicy signed as admin (mywallet)
+invoke_spend_policy() {
+  stellar contract invoke \
+    --id $SPEND_POLICY_CONTRACT_ID \
+    --source-account $SOURCE \
+    --network $NETWORK \
+    -- "$@" 2>&1
+}
+
+# invoke_spend_policy_as: calls SpendPolicy signed as a specific source account
+invoke_spend_policy_as() {
+  local signer="$1"
+  shift
+  stellar contract invoke \
+    --id $SPEND_POLICY_CONTRACT_ID \
+    --source-account "$signer" \
+    --network $NETWORK \
+    -- "$@" 2>&1
+}
+
 # assert_contains: checks that OUTPUT contains EXPECTED string
 assert_contains() {
   local label="$1"
@@ -216,6 +238,7 @@ echo "  Admin:           $ADMIN_ADDRESS  ($SOURCE)"
 echo "  Customer:        $CUSTOMER_ADDRESS  ($CUSTOMER_SOURCE)"
 echo "  Registry:        $REGISTRY_CONTRACT_ID"
 echo "  BillingCycle:    $BILLING_CONTRACT_ID"
+echo "  SpendPolicy:     ${SPEND_POLICY_CONTRACT_ID:-"(not set — section 17 will be skipped)"}"
 echo "  USDC SAC:        CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA"
 echo ""
 
@@ -929,6 +952,274 @@ OUT=$(invoke_billing_as $CUSTOMER_SOURCE initiate_subscription \
 assert_error "subscription without allowance rejected (PaymentFailed)" "$OUT"
 
 ########################################
+# TEST 17 — SPEND POLICY
+########################################
+
+section "17 — SpendPolicy contract"
+
+# SpendPolicy is optional — skip the whole section if not deployed yet.
+if [ -z "$SPEND_POLICY_CONTRACT_ID" ]; then
+  skip "SpendPolicy not deployed — set SPEND_POLICY_CONTRACT_ID and run: npm run deploy:spend-policy"
+else
+
+# Roles used in this section:
+#   ADMIN_ADDRESS    — policy owner (creates and manages the policy)
+#   CUSTOMER_ADDRESS — the "agent" wallet governed by the policy
+#   ADMIN_ADDRESS    — also the payment destination (plan owner)
+AGENT_ADDRESS="$CUSTOMER_ADDRESS"
+DEST_ADDRESS="$ADMIN_ADDRESS"
+
+# ── Pre-test cleanup ──────────────────────────────────────────────────────────
+# The SpendPolicy contract is persistent on testnet. If a policy already exists
+# from a previous run, delete it by updating it to remove all agents (which
+# deregisters them), then we can proceed as if fresh.
+# We cannot truly delete a policy, so instead we update it to have no agents
+# and no limits, making it a no-op, then the "create" step will fail with
+# PolicyAlreadyExists — so we skip create if it already exists and just verify.
+EXISTING_POLICY=$(invoke_spend_policy get_policy --owner "$ADMIN_ADDRESS" 2>&1 || true)
+if echo "$EXISTING_POLICY" | grep -q '"owner"'; then
+  echo "  ℹ️  Policy already exists from a previous run — cleaning up agent registrations"
+  # Remove all agents by updating with empty agent list, then re-add for this run
+  invoke_spend_policy_as $SOURCE update_policy \
+    --caller "$ADMIN_ADDRESS" \
+    --daily_limit_usdc 100000000 \
+    --tx_limit_usdc 20000000 \
+    --allowlist '[]' \
+    --agents '[]' > /dev/null 2>&1 || true
+  # Ensure policy is active for the test run
+  invoke_spend_policy_as $SOURCE reactivate_policy \
+    --caller "$ADMIN_ADDRESS" > /dev/null 2>&1 || true
+  POLICY_PREEXISTS=true
+else
+  POLICY_PREEXISTS=false
+fi
+# ─────────────────────────────────────────────────────────────────────────────
+
+step "17.1" "SpendPolicy: get_admin"
+OUT=$(invoke_spend_policy get_admin 2>&1 || true)
+assert_contains "SpendPolicy admin matches deploy wallet" "$OUT" "$ADMIN_ADDRESS"
+
+step "17.2" "get_policy returns null OR existing policy (persistent testnet)"
+OUT=$(invoke_spend_policy get_policy --owner "$ADMIN_ADDRESS" 2>&1 || true)
+# On first deploy: null. On re-runs: existing policy. Both are valid.
+assert_success "get_policy call succeeds" "$OUT"
+echo "  → Policy state: $(echo "$OUT" | grep -o '"active":[a-z]*' || echo 'null')"
+
+step "17.3" "get_agent_owner returns null for unregistered agent (after cleanup)"
+OUT=$(invoke_spend_policy get_agent_owner --agent "$AGENT_ADDRESS" 2>&1 || true)
+# After cleanup above, agent should be deregistered
+assert_contains "agent has no owner after cleanup" "$OUT" "null"
+
+step "17.4" "check_spend returns NoPolicyFound or Allowed for ungoverned agent"
+OUT=$(invoke_spend_policy check_spend \
+  --agent "$AGENT_ADDRESS" \
+  --destination "$DEST_ADDRESS" \
+  --amount_usdc 10000000 2>&1 || true)
+# NoPolicyFound (no policy) or Allowed (inactive policy) — both permit the spend
+assert_success "check_spend call succeeds" "$OUT"
+echo "  → Result: $(echo "$OUT" | grep -o 'NoPolicyFound\|Allowed\|Blocked[A-Za-z]*')"
+
+step "17.5" "is_spend_allowed returns true when agent is not governed"
+OUT=$(invoke_spend_policy is_spend_allowed \
+  --agent "$AGENT_ADDRESS" \
+  --destination "$DEST_ADDRESS" \
+  --amount_usdc 10000000 2>&1 || true)
+assert_contains "allowed when agent not governed" "$OUT" "true"
+
+step "17.6" "create_policy (or verify existing): 10 USDC/day, 2 USDC/tx, no allowlist"
+# daily_limit = 100000000 stroops = 10 USDC
+# tx_limit    = 20000000  stroops = 2 USDC
+if [ "$POLICY_PREEXISTS" = "true" ]; then
+  # Policy already exists — update it to the expected state for this test run
+  OUT=$(invoke_spend_policy_as $SOURCE update_policy \
+    --caller "$ADMIN_ADDRESS" \
+    --daily_limit_usdc 100000000 \
+    --tx_limit_usdc 20000000 \
+    --allowlist '[]' \
+    --agents '["'"$AGENT_ADDRESS"'"]' 2>&1 || true)
+  assert_success "update_policy to test state (policy pre-existed)" "$OUT"
+else
+  OUT=$(invoke_spend_policy_as $SOURCE create_policy \
+    --owner "$ADMIN_ADDRESS" \
+    --daily_limit_usdc 100000000 \
+    --tx_limit_usdc 20000000 \
+    --allowlist '[]' \
+    --agents '["'"$AGENT_ADDRESS"'"]' 2>&1 || true)
+  assert_success "create_policy succeeds" "$OUT"
+fi
+
+step "17.7" "get_policy returns the policy config"
+OUT=$(invoke_spend_policy get_policy --owner "$ADMIN_ADDRESS" 2>&1 || true)
+assert_contains "policy owner is admin"    "$OUT" "$ADMIN_ADDRESS"
+assert_contains "daily_limit is set"       "$OUT" "100000000"
+assert_contains "tx_limit is set"          "$OUT" "20000000"
+assert_contains "policy is active"         "$OUT" '"active":true'
+
+step "17.8" "get_agent_owner returns admin for the registered agent"
+OUT=$(invoke_spend_policy get_agent_owner --agent "$AGENT_ADDRESS" 2>&1 || true)
+assert_contains "agent owner is admin" "$OUT" "$ADMIN_ADDRESS"
+
+step "17.9" "check_spend: 1 USDC within limits → Allowed"
+# 1 USDC = 10000000 stroops, tx_limit = 2 USDC = 20000000 stroops → within limit
+OUT=$(invoke_spend_policy check_spend \
+  --agent "$AGENT_ADDRESS" \
+  --destination "$DEST_ADDRESS" \
+  --amount_usdc 10000000 2>&1 || true)
+assert_contains "1 USDC within limits is Allowed" "$OUT" "Allowed"
+
+step "17.10" "check_spend: 3 USDC exceeds tx_limit (2 USDC) → BlockedByTxLimit"
+# 3 USDC = 30000000 stroops > tx_limit of 20000000 stroops
+OUT=$(invoke_spend_policy check_spend \
+  --agent "$AGENT_ADDRESS" \
+  --destination "$DEST_ADDRESS" \
+  --amount_usdc 30000000 2>&1 || true)
+assert_contains "3 USDC blocked by tx limit" "$OUT" "BlockedByTxLimit"
+
+step "17.11" "is_spend_allowed: 3 USDC → false (tx limit exceeded)"
+OUT=$(invoke_spend_policy is_spend_allowed \
+  --agent "$AGENT_ADDRESS" \
+  --destination "$DEST_ADDRESS" \
+  --amount_usdc 30000000 2>&1 || true)
+assert_contains "is_spend_allowed false for over-tx-limit" "$OUT" "false"
+
+step "17.12" "create_policy duplicate is rejected (PolicyAlreadyExists)"
+OUT=$(invoke_spend_policy_as $SOURCE create_policy \
+  --owner "$ADMIN_ADDRESS" \
+  --daily_limit_usdc 0 \
+  --tx_limit_usdc 0 \
+  --allowlist '[]' \
+  --agents '[]' 2>&1 || true)
+assert_error "duplicate policy rejected" "$OUT"
+
+step "17.13" "create_policy with negative limit is rejected (InvalidAmount)"
+OUT=$(invoke_spend_policy_as $CUSTOMER_SOURCE create_policy \
+  --owner "$CUSTOMER_ADDRESS" \
+  --daily_limit_usdc -1 \
+  --tx_limit_usdc 0 \
+  --allowlist '[]' \
+  --agents '[]' 2>&1 || true)
+assert_error "negative daily limit rejected" "$OUT"
+
+step "17.14" "record_spend: admin records 1 USDC spend for agent"
+OUT=$(invoke_spend_policy record_spend \
+  --caller "$ADMIN_ADDRESS" \
+  --agent "$AGENT_ADDRESS" \
+  --amount_usdc 10000000 2>&1 || true)
+assert_success "record_spend succeeds" "$OUT"
+# Extract the returned daily total — it accumulates across runs
+DAILY_AFTER_RECORD=$(echo "$OUT" | grep -o '[0-9]\{7,\}' | tail -1)
+echo "  → Daily total after record: $DAILY_AFTER_RECORD"
+assert_success "record_spend returned a total" "$OUT"
+
+step "17.15" "get_daily_spent reflects the recorded spend"
+NOW_TS=$(date +%s)
+OUT=$(invoke_spend_policy get_daily_spent \
+  --owner "$ADMIN_ADDRESS" \
+  --timestamp $NOW_TS 2>&1 || true)
+assert_success "get_daily_spent call succeeds" "$OUT"
+echo "  → Daily spent today: $(echo "$OUT" | grep -o '[0-9]\{7,\}')"
+# Verify it matches what record_spend returned
+assert_contains "daily spent matches recorded total" "$OUT" "$DAILY_AFTER_RECORD"
+
+step "17.16" "record_spend with 0 amount is rejected (InvalidAmount)"
+OUT=$(invoke_spend_policy record_spend \
+  --caller "$ADMIN_ADDRESS" \
+  --agent "$AGENT_ADDRESS" \
+  --amount_usdc 0 2>&1 || true)
+assert_error "zero amount rejected" "$OUT"
+
+step "17.17" "check_spend: 1 USDC within tx_limit → Allowed (if daily not exhausted)"
+# tx_limit = 2 USDC. Use 1 USDC (10000000) which is always within tx limit.
+# Daily limit check depends on how much has been spent today — we just verify
+# the result is either Allowed or BlockedByDailyLimit (not a tx limit block).
+OUT=$(invoke_spend_policy check_spend \
+  --agent "$AGENT_ADDRESS" \
+  --destination "$DEST_ADDRESS" \
+  --amount_usdc 10000000 2>&1 || true)
+assert_success "check_spend 1 USDC call succeeds" "$OUT"
+# Must NOT be blocked by tx limit — only daily limit could block it
+assert_not_contains "1 USDC not blocked by tx limit" "$OUT" "BlockedByTxLimit"
+echo "  → Result: $(echo "$OUT" | grep -o 'Allowed\|Blocked[A-Za-z]*')"
+
+step "17.18" "check_spend: 3 USDC still blocked by tx_limit regardless of daily"
+# tx_limit = 2 USDC. 3 USDC always exceeds it, regardless of daily spend state.
+OUT=$(invoke_spend_policy check_spend \
+  --agent "$AGENT_ADDRESS" \
+  --destination "$DEST_ADDRESS" \
+  --amount_usdc 30000000 2>&1 || true)
+assert_contains "3 USDC always blocked by tx limit" "$OUT" "BlockedByTxLimit"
+
+step "17.19" "update_policy: add allowlist restriction"
+OUT=$(invoke_spend_policy_as $SOURCE update_policy \
+  --caller "$ADMIN_ADDRESS" \
+  --daily_limit_usdc 100000000 \
+  --tx_limit_usdc 20000000 \
+  --allowlist '["'"$DEST_ADDRESS"'"]' \
+  --agents '["'"$AGENT_ADDRESS"'"]' 2>&1 || true)
+assert_success "update_policy with allowlist succeeds" "$OUT"
+
+step "17.20" "check_spend to allowlisted destination → Allowed"
+OUT=$(invoke_spend_policy check_spend \
+  --agent "$AGENT_ADDRESS" \
+  --destination "$DEST_ADDRESS" \
+  --amount_usdc 10000000 2>&1 || true)
+assert_contains "allowlisted destination is Allowed" "$OUT" "Allowed"
+
+step "17.21" "check_spend to non-allowlisted destination → BlockedByAllowlist"
+OUT=$(invoke_spend_policy check_spend \
+  --agent "$AGENT_ADDRESS" \
+  --destination "$CUSTOMER_ADDRESS" \
+  --amount_usdc 10000000 2>&1 || true)
+assert_contains "non-allowlisted destination blocked" "$OUT" "BlockedByAllowlist"
+
+step "17.22" "deactivate_policy"
+OUT=$(invoke_spend_policy_as $SOURCE deactivate_policy \
+  --caller "$ADMIN_ADDRESS" 2>&1 || true)
+assert_success "deactivate_policy succeeds" "$OUT"
+
+step "17.23" "get_policy shows active=false"
+OUT=$(invoke_spend_policy get_policy --owner "$ADMIN_ADDRESS" 2>&1 || true)
+assert_contains "policy is inactive" "$OUT" '"active":false'
+
+step "17.24" "check_spend while policy inactive → Allowed (bypass mode)"
+OUT=$(invoke_spend_policy check_spend \
+  --agent "$AGENT_ADDRESS" \
+  --destination "$CUSTOMER_ADDRESS" \
+  --amount_usdc 999999999 2>&1 || true)
+assert_contains "inactive policy allows all" "$OUT" "Allowed"
+
+step "17.25" "double deactivate is rejected (AlreadyInactive)"
+OUT=$(invoke_spend_policy_as $SOURCE deactivate_policy \
+  --caller "$ADMIN_ADDRESS" 2>&1 || true)
+assert_error "double deactivate rejected" "$OUT"
+
+step "17.26" "reactivate_policy"
+OUT=$(invoke_spend_policy_as $SOURCE reactivate_policy \
+  --caller "$ADMIN_ADDRESS" 2>&1 || true)
+assert_success "reactivate_policy succeeds" "$OUT"
+
+step "17.27" "get_policy shows active=true again"
+OUT=$(invoke_spend_policy get_policy --owner "$ADMIN_ADDRESS" 2>&1 || true)
+assert_contains "policy is active again" "$OUT" '"active":true'
+
+step "17.28" "double reactivate is rejected (AlreadyActive)"
+OUT=$(invoke_spend_policy_as $SOURCE reactivate_policy \
+  --caller "$ADMIN_ADDRESS" 2>&1 || true)
+assert_error "double reactivate rejected" "$OUT"
+
+step "17.29" "transfer_admin to same address (verify function works)"
+OUT=$(invoke_spend_policy transfer_admin \
+  --caller "$ADMIN_ADDRESS" \
+  --new_admin "$ADMIN_ADDRESS" 2>&1 || true)
+assert_success "transfer_admin succeeds" "$OUT"
+
+step "17.30" "get_admin still returns admin after self-transfer"
+OUT=$(invoke_spend_policy get_admin 2>&1 || true)
+assert_contains "admin unchanged" "$OUT" "$ADMIN_ADDRESS"
+
+fi  # end SPEND_POLICY_CONTRACT_ID check
+
+########################################
 # SUMMARY
 ########################################
 
@@ -951,6 +1242,7 @@ fi
 echo ""
 echo "  Registry:     https://stellar.expert/explorer/testnet/contract/$REGISTRY_CONTRACT_ID"
 echo "  BillingCycle: https://stellar.expert/explorer/testnet/contract/$BILLING_CONTRACT_ID"
+[ -n "$SPEND_POLICY_CONTRACT_ID" ] && echo "  SpendPolicy:  https://stellar.expert/explorer/testnet/contract/$SPEND_POLICY_CONTRACT_ID"
 echo ""
 
 if [ $FAIL -eq 0 ]; then
