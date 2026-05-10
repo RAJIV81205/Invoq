@@ -103,7 +103,7 @@ jobs:
           workspaces: . -> target
 
       - name: Install Stellar CLI
-        run: cargo install --locked stellar-cli --features opt
+        run: cargo install --locked stellar-cli
 
       - name: Compile contracts
         run: stellar contract build
