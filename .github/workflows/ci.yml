@@ -103,7 +103,12 @@ jobs:
           workspaces: . -> target
 
       - name: Install Stellar CLI
-        run: cargo install --locked stellar-cli
+        run: |
+          # Download pre-built binary instead of compiling from source (~10s vs ~10min)
+          STELLAR_VERSION="26.0.0"
+          curl -sSL "https://github.com/stellar/stellar-cli/releases/download/v${STELLAR_VERSION}/stellar-cli-${STELLAR_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C /usr/local/bin stellar
+          stellar --version
 
       - name: Compile contracts
         run: stellar contract build
@@ -111,13 +116,19 @@ jobs:
       - name: Verify WASM artifacts
         run: |
           echo "Compiled contracts:"
+          for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
+            [ -f "$wasm" ] && echo "  ✓ $(basename $wasm) — $(wc -c < $wasm) bytes"
+          done
+          # stellar contract build may also output to wasm32v1-none on newer toolchains
           for wasm in target/wasm32v1-none/release/*.wasm; do
-            echo "  ✓ $(basename $wasm) — $(wc -c < $wasm) bytes"
+            [ -f "$wasm" ] && echo "  ✓ $(basename $wasm) — $(wc -c < $wasm) bytes"
           done
 
       - name: Upload WASM artifacts
         uses: actions/upload-artifact@v4
         with:
           name: wasm-contracts-${{ github.sha }}
-          path: target/wasm32v1-none/release/*.wasm
+          path: |
+            target/wasm32-unknown-unknown/release/*.wasm
+            target/wasm32v1-none/release/*.wasm
           retention-days: 30
