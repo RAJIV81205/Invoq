@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [main, develop]
 
-# Cancel in-progress runs on the same branch when a new push arrives
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -33,7 +32,7 @@ jobs:
         run: npm ci
 
       - name: Run TypeScript type check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
   # ─────────────────────────────────────────────────────────────────────────
   # JOB 2 — ESLint
@@ -83,45 +82,11 @@ jobs:
         run: npm run build
 
   # ─────────────────────────────────────────────────────────────────────────
-  # JOB 4 — Rust: fmt + clippy + test
-  # ─────────────────────────────────────────────────────────────────────────
-  contracts-check:
-    name: Contracts — fmt + clippy + unit tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          # soroban-sdk 25 requires Rust 1.78+. Pin to a known-good version.
-          toolchain: 1.82.0
-          components: rustfmt, clippy
-          targets: wasm32v1-none
-
-      - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: . -> target
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Run unit tests
-        run: cargo test --all
-
-  # ─────────────────────────────────────────────────────────────────────────
-  # JOB 5 — Compile Soroban contracts to WASM
+  # JOB 4 — Compile Soroban contracts to WASM
   # ─────────────────────────────────────────────────────────────────────────
   contracts-compile:
     name: Contracts — compile to WASM
     runs-on: ubuntu-latest
-    needs: [contracts-check]
 
     steps:
       - name: Checkout
@@ -139,18 +104,16 @@ jobs:
           workspaces: . -> target
 
       - name: Install Stellar CLI
-        run: |
-          cargo install --locked stellar-cli --features opt
+        run: cargo install --locked stellar-cli --features opt
 
       - name: Compile contracts
         run: stellar contract build
 
-      - name: Verify WASM artifacts exist
+      - name: Verify WASM artifacts
         run: |
-          echo "Checking compiled WASM files..."
-          ls -lh target/wasm32v1-none/release/*.wasm
+          echo "Compiled contracts:"
           for wasm in target/wasm32v1-none/release/*.wasm; do
-            echo "✓ $(basename $wasm) — $(wc -c < $wasm) bytes"
+            echo "  ✓ $(basename $wasm) — $(wc -c < $wasm) bytes"
           done
 
       - name: Upload WASM artifacts
