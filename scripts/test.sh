@@ -23,6 +23,7 @@
 #   15. Admin transfer
 #   16. USDC paid plan integration (approve → subscribe → verify payment → cancel)
 #   17. SpendPolicy — initialization, policy lifecycle, spend checks, recording
+#   18. EscrowVault — initialization, vault lifecycle, deposits, debits, withdrawals, close
 #
 # USAGE
 # ─────
@@ -65,6 +66,7 @@ CUSTOMER_SOURCE="imported"
 REGISTRY_CONTRACT_ID="CCYREON6K2AGO5DRQMTW4MVNYBBOLOPZMP4RP7JY6H3FXUFQFH2SXQYA"
 BILLING_CONTRACT_ID="CCCFUSKCBHLVDWHLO7WYZ5EEC3QRYZLUQ5HWCPAGB7J5WKS3B2NOMKHO"
 SPEND_POLICY_CONTRACT_ID="CDTLW43XT55X5FZB3PPC5Y7UG6PSYC4LW3ZED23YIEIVDXVOT72QHFPG"   # Set after: npm run deploy:spend-policy
+ESCROW_VAULT_CONTRACT_ID="CBANJOGMJZ3CAIHX45UWUTDUVXZIMUYOZPXNHYZLKKHZBQ5ZAR6L2LLO"   # Set after: npm run deploy:escrow-vault
 
 # Validate core contracts
 if [ -z "$REGISTRY_CONTRACT_ID" ] || [ -z "$BILLING_CONTRACT_ID" ]; then
@@ -176,6 +178,26 @@ invoke_spend_policy_as() {
     -- "$@" 2>&1
 }
 
+# invoke_escrow_vault: calls EscrowVault signed as admin (mywallet)
+invoke_escrow_vault() {
+  stellar contract invoke \
+    --id $ESCROW_VAULT_CONTRACT_ID \
+    --source-account $SOURCE \
+    --network $NETWORK \
+    -- "$@" 2>&1
+}
+
+# invoke_escrow_vault_as: calls EscrowVault signed as a specific source account
+invoke_escrow_vault_as() {
+  local signer="$1"
+  shift
+  stellar contract invoke \
+    --id $ESCROW_VAULT_CONTRACT_ID \
+    --source-account "$signer" \
+    --network $NETWORK \
+    -- "$@" 2>&1
+}
+
 # assert_contains: checks that OUTPUT contains EXPECTED string
 assert_contains() {
   local label="$1"
@@ -239,6 +261,7 @@ echo "  Customer:        $CUSTOMER_ADDRESS  ($CUSTOMER_SOURCE)"
 echo "  Registry:        $REGISTRY_CONTRACT_ID"
 echo "  BillingCycle:    $BILLING_CONTRACT_ID"
 echo "  SpendPolicy:     ${SPEND_POLICY_CONTRACT_ID:-"(not set — section 17 will be skipped)"}"
+echo "  EscrowVault:     ${ESCROW_VAULT_CONTRACT_ID:-"(not set — section 18 will be skipped)"}"
 echo "  USDC SAC:        CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA"
 echo ""
 
@@ -1220,6 +1243,328 @@ assert_contains "admin unchanged" "$OUT" "$ADMIN_ADDRESS"
 fi  # end SPEND_POLICY_CONTRACT_ID check
 
 ########################################
+# TEST 18 — ESCROW VAULT
+########################################
+
+section "18 — EscrowVault contract"
+
+# EscrowVault is optional — skip the whole section if not deployed yet.
+if [ -z "$ESCROW_VAULT_CONTRACT_ID" ]; then
+  skip "EscrowVault not deployed — set ESCROW_VAULT_CONTRACT_ID and run: npm run deploy:escrow-vault"
+else
+
+# Roles used in this section:
+#   ADMIN_ADDRESS    — contract admin (Invoq metering service)
+#   CUSTOMER_ADDRESS — vault owner (deposits and withdraws)
+#   ADMIN_ADDRESS    — also the developer receiving debits (same wallet, different role)
+VAULT_CUSTOMER="$CUSTOMER_ADDRESS"
+VAULT_DEVELOPER="$ADMIN_ADDRESS"
+USDC_SAC="CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA"
+
+# Minimum deposit is 1_000_000 stroops = 0.10 USDC
+INITIAL_DEPOSIT=5000000   # 0.50 USDC
+DEPOSIT_AMOUNT=2000000    # 0.20 USDC
+DEBIT_AMOUNT=1000000      # 0.10 USDC
+WITHDRAW_AMOUNT=1000000   # 0.10 USDC
+
+# ── Pre-test cleanup ──────────────────────────────────────────────────────────
+# If a vault already exists from a previous run, close it first so we start
+# from a clean state. close_vault refunds the balance and removes the record.
+EXISTING_VAULT=$(invoke_escrow_vault get_vault \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+if echo "$EXISTING_VAULT" | grep -q '"customer"'; then
+  echo "  ℹ️  Vault already exists from a previous run — closing it for a clean start"
+  invoke_escrow_vault close_vault \
+    --caller "$ADMIN_ADDRESS" \
+    --customer "$VAULT_CUSTOMER" \
+    --developer "$VAULT_DEVELOPER" > /dev/null 2>&1 || true
+fi
+# ─────────────────────────────────────────────────────────────────────────────
+
+step "18.1" "EscrowVault: get_admin"
+OUT=$(invoke_escrow_vault get_admin 2>&1 || true)
+assert_contains "EscrowVault admin matches deploy wallet" "$OUT" "$ADMIN_ADDRESS"
+
+step "18.2" "EscrowVault: get_usdc_sac"
+OUT=$(invoke_escrow_vault get_usdc_sac 2>&1 || true)
+assert_contains "USDC SAC address is correct" "$OUT" "$USDC_SAC"
+
+step "18.3" "vault_exists returns false before creation"
+OUT=$(invoke_escrow_vault vault_exists \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_contains "vault does not exist yet" "$OUT" "false"
+
+step "18.4" "get_vault returns null before creation"
+OUT=$(invoke_escrow_vault get_vault \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_contains "get_vault returns null before creation" "$OUT" "null"
+
+# ── Approve USDC allowance for the vault contract ─────────────────────────────
+# Customer must approve EscrowVault as a spender before create_vault can
+# pull the initial deposit via SAC transfer.
+CURRENT_LEDGER=$(curl -sf "https://horizon-testnet.stellar.org/ledgers?order=desc&limit=1" \
+  2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['_embedded']['records'][0]['sequence'])" \
+  2>/dev/null || echo "0")
+if [ -z "$CURRENT_LEDGER" ] || [ "$CURRENT_LEDGER" = "0" ]; then
+  skip "18.5–18.x: Could not fetch current ledger — skipping USDC-dependent vault tests"
+else
+
+EXPIRY_LEDGER=$((CURRENT_LEDGER + 518400))  # ~30 days
+
+step "18.5" "Approve EscrowVault to spend USDC on behalf of customer"
+OUT=$(stellar contract invoke \
+  --id "$USDC_SAC" \
+  --source-account $CUSTOMER_SOURCE \
+  --network $NETWORK \
+  -- approve \
+  --from "$VAULT_CUSTOMER" \
+  --spender "$ESCROW_VAULT_CONTRACT_ID" \
+  --amount 20000000 \
+  --expiration_ledger $EXPIRY_LEDGER 2>&1 || true)
+assert_success "USDC approve for EscrowVault succeeds" "$OUT"
+
+step "18.6" "create_vault: 0.50 USDC initial deposit, no threshold, no auto top-up"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE create_vault \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --initial_deposit $INITIAL_DEPOSIT \
+  --low_balance_threshold 0 \
+  --auto_topup_amount 0 2>&1 || true)
+assert_success "create_vault succeeds" "$OUT"
+assert_contains "vault record returned"       "$OUT" '"customer"'
+assert_contains "balance equals deposit"      "$OUT" "$INITIAL_DEPOSIT"
+assert_contains "total_deposited is correct"  "$OUT" "$INITIAL_DEPOSIT"
+assert_contains "total_debited is 0"          "$OUT" '"total_debited":"0"'
+
+step "18.7" "vault_exists returns true after creation"
+OUT=$(invoke_escrow_vault vault_exists \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_contains "vault exists after creation" "$OUT" "true"
+
+step "18.8" "get_vault returns the vault record"
+OUT=$(invoke_escrow_vault get_vault \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_contains "vault customer matches"   "$OUT" "$VAULT_CUSTOMER"
+assert_contains "vault developer matches"  "$OUT" "$VAULT_DEVELOPER"
+assert_contains "balance is correct"       "$OUT" "$INITIAL_DEPOSIT"
+
+step "18.9" "get_balance returns the vault balance"
+OUT=$(invoke_escrow_vault get_balance \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_contains "get_balance returns initial deposit" "$OUT" "$INITIAL_DEPOSIT"
+
+step "18.10" "create_vault duplicate is rejected (VaultAlreadyExists)"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE create_vault \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --initial_deposit $INITIAL_DEPOSIT \
+  --low_balance_threshold 0 \
+  --auto_topup_amount 0 2>&1 || true)
+assert_error "duplicate vault rejected (VaultAlreadyExists)" "$OUT"
+
+step "18.11" "create_vault with deposit below minimum is rejected (DepositTooSmall)"
+# Min deposit is 1_000_000 stroops. Use 500_000 (0.05 USDC).
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE create_vault \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --initial_deposit 500000 \
+  --low_balance_threshold 0 \
+  --auto_topup_amount 0 2>&1 || true)
+assert_error "deposit below minimum rejected (DepositTooSmall)" "$OUT"
+
+step "18.12" "deposit: add 0.20 USDC to the vault"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE deposit \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --amount $DEPOSIT_AMOUNT 2>&1 || true)
+assert_success "deposit succeeds" "$OUT"
+EXPECTED_BALANCE=$((INITIAL_DEPOSIT + DEPOSIT_AMOUNT))
+assert_contains "balance after deposit is correct" "$OUT" "$EXPECTED_BALANCE"
+
+step "18.13" "get_balance reflects the deposit"
+OUT=$(invoke_escrow_vault get_balance \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_contains "balance updated after deposit" "$OUT" "$EXPECTED_BALANCE"
+
+step "18.14" "deposit below minimum is rejected (DepositTooSmall)"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE deposit \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --amount 100000 2>&1 || true)
+assert_error "deposit below minimum rejected" "$OUT"
+
+step "18.15" "debit_vault: admin debits 0.10 USDC to developer"
+OUT=$(invoke_escrow_vault debit_vault \
+  --caller "$ADMIN_ADDRESS" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --amount $DEBIT_AMOUNT \
+  --usage_description '"100 API calls"' 2>&1 || true)
+assert_success "debit_vault succeeds" "$OUT"
+EXPECTED_AFTER_DEBIT=$((EXPECTED_BALANCE - DEBIT_AMOUNT))
+assert_contains "balance after debit is correct" "$OUT" "$EXPECTED_AFTER_DEBIT"
+
+step "18.16" "get_vault shows updated total_debited"
+OUT=$(invoke_escrow_vault get_vault \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_contains "total_debited reflects the debit" "$OUT" "$DEBIT_AMOUNT"
+
+step "18.17" "debit_vault with zero amount is rejected (InvalidAmount)"
+OUT=$(invoke_escrow_vault debit_vault \
+  --caller "$ADMIN_ADDRESS" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --amount 0 \
+  --usage_description '"zero"' 2>&1 || true)
+assert_error "zero debit rejected (InvalidAmount)" "$OUT"
+
+step "18.18" "debit_vault exceeding balance is rejected (InsufficientVaultBalance)"
+OUT=$(invoke_escrow_vault debit_vault \
+  --caller "$ADMIN_ADDRESS" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --amount 999999999 \
+  --usage_description '"too much"' 2>&1 || true)
+assert_error "over-balance debit rejected (InsufficientVaultBalance)" "$OUT"
+
+step "18.19" "debit_vault by non-admin is rejected (Unauthorized)"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE debit_vault \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --amount $DEBIT_AMOUNT \
+  --usage_description '"unauthorized"' 2>&1 || true)
+assert_error "non-admin debit rejected (Unauthorized)" "$OUT"
+
+step "18.20" "update_threshold: set low-balance alert to 2 USDC, no auto top-up"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE update_threshold \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --new_threshold 20000000 \
+  --new_auto_topup 0 2>&1 || true)
+assert_success "update_threshold succeeds" "$OUT"
+
+step "18.21" "get_vault shows updated threshold"
+OUT=$(invoke_escrow_vault get_vault \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_contains "low_balance_threshold updated" "$OUT" "20000000"
+
+step "18.22" "update_threshold with negative value is rejected (InvalidThreshold)"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE update_threshold \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --new_threshold -1 \
+  --new_auto_topup 0 2>&1 || true)
+assert_error "negative threshold rejected (InvalidThreshold)" "$OUT"
+
+step "18.23" "withdraw: customer withdraws 0.10 USDC"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE withdraw \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --amount $WITHDRAW_AMOUNT 2>&1 || true)
+assert_success "withdraw succeeds" "$OUT"
+EXPECTED_AFTER_WITHDRAW=$((EXPECTED_AFTER_DEBIT - WITHDRAW_AMOUNT))
+assert_contains "balance after withdraw is correct" "$OUT" "$EXPECTED_AFTER_WITHDRAW"
+
+step "18.24" "withdraw with zero amount is rejected (InvalidAmount)"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE withdraw \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --amount 0 2>&1 || true)
+assert_error "zero withdraw rejected (InvalidAmount)" "$OUT"
+
+step "18.25" "withdraw exceeding balance is rejected (InsufficientVaultBalance)"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE withdraw \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --amount 999999999 2>&1 || true)
+assert_error "over-balance withdraw rejected (InsufficientVaultBalance)" "$OUT"
+
+step "18.26" "withdraw by non-owner is rejected (Unauthorized)"
+OUT=$(invoke_escrow_vault withdraw \
+  --caller "$ADMIN_ADDRESS" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --amount $WITHDRAW_AMOUNT 2>&1 || true)
+assert_error "non-owner withdraw rejected (Unauthorized)" "$OUT"
+
+step "18.27" "transfer_admin to same address (verify function works)"
+OUT=$(invoke_escrow_vault transfer_admin \
+  --caller "$ADMIN_ADDRESS" \
+  --new_admin "$ADMIN_ADDRESS" 2>&1 || true)
+assert_success "transfer_admin succeeds" "$OUT"
+
+step "18.28" "get_admin still returns admin after self-transfer"
+OUT=$(invoke_escrow_vault get_admin 2>&1 || true)
+assert_contains "admin unchanged after self-transfer" "$OUT" "$ADMIN_ADDRESS"
+
+step "18.29" "close_vault: admin closes the vault and refunds remaining balance"
+OUT=$(invoke_escrow_vault close_vault \
+  --caller "$ADMIN_ADDRESS" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_success "close_vault succeeds" "$OUT"
+assert_contains "refunded amount is non-negative" "$OUT" "refunded"
+
+step "18.30" "vault_exists returns false after close"
+OUT=$(invoke_escrow_vault vault_exists \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_contains "vault gone after close" "$OUT" "false"
+
+step "18.31" "get_vault returns null after close"
+OUT=$(invoke_escrow_vault get_vault \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_contains "get_vault null after close" "$OUT" "null"
+
+step "18.32" "close_vault on non-existent vault is rejected (VaultNotFound)"
+OUT=$(invoke_escrow_vault close_vault \
+  --caller "$ADMIN_ADDRESS" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_error "close on non-existent vault rejected (VaultNotFound)" "$OUT"
+
+step "18.33" "create_vault can be called again after close (same pair)"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE create_vault \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" \
+  --initial_deposit $INITIAL_DEPOSIT \
+  --low_balance_threshold 0 \
+  --auto_topup_amount 0 2>&1 || true)
+assert_success "re-create vault after close succeeds" "$OUT"
+
+step "18.34" "customer closes their own vault (customer auth)"
+OUT=$(invoke_escrow_vault_as $CUSTOMER_SOURCE close_vault \
+  --caller "$VAULT_CUSTOMER" \
+  --customer "$VAULT_CUSTOMER" \
+  --developer "$VAULT_DEVELOPER" 2>&1 || true)
+assert_success "customer can close their own vault" "$OUT"
+
+fi  # end ledger fetch check
+fi  # end ESCROW_VAULT_CONTRACT_ID check
+
+########################################
 # SUMMARY
 ########################################
 
@@ -1242,7 +1587,8 @@ fi
 echo ""
 echo "  Registry:     https://stellar.expert/explorer/testnet/contract/$REGISTRY_CONTRACT_ID"
 echo "  BillingCycle: https://stellar.expert/explorer/testnet/contract/$BILLING_CONTRACT_ID"
-[ -n "$SPEND_POLICY_CONTRACT_ID" ] && echo "  SpendPolicy:  https://stellar.expert/explorer/testnet/contract/$SPEND_POLICY_CONTRACT_ID"
+[ -n "$SPEND_POLICY_CONTRACT_ID"  ] && echo "  SpendPolicy:  https://stellar.expert/explorer/testnet/contract/$SPEND_POLICY_CONTRACT_ID"
+[ -n "$ESCROW_VAULT_CONTRACT_ID"  ] && echo "  EscrowVault:  https://stellar.expert/explorer/testnet/contract/$ESCROW_VAULT_CONTRACT_ID"
 echo ""
 
 if [ $FAIL -eq 0 ]; then
