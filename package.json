@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "compile": "stellar contract build",
     "deploy": "bash scripts/deploy.sh",
     "deploy:spend-policy": "bash scripts/deploy.sh --mode spend-policy",
