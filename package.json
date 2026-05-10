@@ -9,7 +9,8 @@
     "lint": "eslint",
     "compile": "stellar contract build",
     "deploy": "bash scripts/deploy.sh",
-    "test" : "bash scripts/test.sh"
+    "deploy:spend-policy": "bash scripts/deploy.sh --mode spend-policy",
+    "test": "bash scripts/test.sh"
   },
   "dependencies": {
     "next": "16.2.6",
