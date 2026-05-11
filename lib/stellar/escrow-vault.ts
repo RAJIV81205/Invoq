@@ -20,8 +20,9 @@ import {
   toScString,
   getAdminPublicKey,
 } from "./client";
+import { ESCROW_VAULT_CONTRACT_ADDRESS } from "../config";
 
-const CONTRACT_ID = process.env.ESCROW_VAULT_CONTRACT_ID!;
+const CONTRACT_ID = ESCROW_VAULT_CONTRACT_ADDRESS!;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

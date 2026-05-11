@@ -13,8 +13,9 @@ import {
   getAdminPublicKey,
 } from "./client";
 import { xdr } from "@stellar/stellar-sdk";
+import { SPEND_POLICY_CONTRACT_ADDRESS } from "../config";
 
-const CONTRACT_ID = process.env.SPEND_POLICY_CONTRACT_ID!;
+const CONTRACT_ID = SPEND_POLICY_CONTRACT_ADDRESS!;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

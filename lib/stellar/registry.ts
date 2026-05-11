@@ -20,8 +20,9 @@ import {
   getAdminPublicKey,
 } from "./client";
 import { xdr } from "@stellar/stellar-sdk";
+import { SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS } from "../config";
 
-const CONTRACT_ID = process.env.REGISTRY_CONTRACT_ID!;
+const CONTRACT_ID = SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS!;
 
 // ─── Types mirroring the Rust contract structs ─────────────────────────────────
 

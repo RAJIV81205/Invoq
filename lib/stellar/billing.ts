@@ -12,8 +12,9 @@ import {
   getAdminPublicKey,
 } from "./client";
 import { xdr } from "@stellar/stellar-sdk";
+import { BILLING_CYCLE_CONTRACT_ADDRESS } from "../config";
 
-const CONTRACT_ID = process.env.BILLING_CONTRACT_ID!;
+const CONTRACT_ID = BILLING_CYCLE_CONTRACT_ADDRESS!;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
