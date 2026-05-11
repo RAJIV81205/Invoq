@@ -21,8 +21,8 @@ import {
   buildCreateVaultTxXdr,
   wrapAndSubmit,
   verifyInnerTxSigner,
-  getNetworkPassphrase,
 } from "../lib/stellar/feeBump.js";
+import { getNetworkPassphrase } from "../lib/stellar/client.js";
 import { db, subscriptionCache, newId, now } from "../lib/db/index.js";
 import { invalidateEntitlementCache } from "../lib/cache/redis.js";
 import { getSubscription } from "../lib/stellar/registry.js";

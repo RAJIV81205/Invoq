@@ -51,6 +51,11 @@ router.post(
       })
       .returning();
 
+    if (!endpoint) {
+      res.status(500).json({ error: "Failed to create webhook endpoint" });
+      return;
+    }
+
     res.status(201).json({
       id:            endpoint.id,
       url:           endpoint.url,
@@ -90,7 +95,12 @@ router.delete(
   authenticate(),
   asyncHandler(async (req, res) => {
     const { developerId }  = res.locals.auth;
-    const { endpointId }   = req.params;
+    const endpointId = req.params.endpointId;
+    
+    if (!endpointId || Array.isArray(endpointId)) {
+      res.status(400).json({ error: "endpointId is required" });
+      return;
+    }
 
     await db
       .delete(webhookEndpoints)

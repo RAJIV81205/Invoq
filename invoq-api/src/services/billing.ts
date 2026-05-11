@@ -124,6 +124,7 @@ export async function runGraceExpiry(): Promise<void> {
       if (cacheRow.length === 0) continue;
       const row = cacheRow[0];
 
+      if (!row) continue;
    
       await db
         .update(subscriptionCache)

@@ -46,7 +46,11 @@ router.get(
   "/:customerAddress",
   authenticate(),
   asyncHandler(async (req, res) => {
-    const { customerAddress } = req.params;
+    const customerAddress = req.params.customerAddress;
+    if (!customerAddress || Array.isArray(customerAddress)) {
+      res.status(400).json({ error: "customerAddress is required" });
+      return;
+    }
     const sub = await getSubscription(customerAddress);
 
     if (!sub) {

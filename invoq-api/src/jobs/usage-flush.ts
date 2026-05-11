@@ -6,13 +6,13 @@
  */
 
 import { Queue, Worker } from "bullmq";
-import { redis } from "../lib/cache/redis.js";
+import { getRedisConnectionConfig } from "../lib/cache/redis.js";
 import { flushUsageBuffer } from "../services/metering.js";
 
 const QUEUE_NAME = "usage-flush";
 
 export function startUsageFlushJob(): void {
-  const queue = new Queue(QUEUE_NAME, { connection: redis() });
+  const queue = new Queue(QUEUE_NAME, { connection: getRedisConnectionConfig() });
 
   queue.add(
     "run",
@@ -35,7 +35,7 @@ export function startUsageFlushJob(): void {
         console.error("[usage-flush] partial error:", result.error);
       }
     },
-    { connection: redis() }
+    { connection: getRedisConnectionConfig() }
   );
 
   worker.on("failed", (job, err) => {

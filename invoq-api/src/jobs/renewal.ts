@@ -6,13 +6,13 @@
  */
 
 import { Queue, Worker } from "bullmq";
-import { redis } from "../lib/cache/redis.js";
+import { getRedisConnectionConfig } from "../lib/cache/redis.js";
 import { runRenewalCycle } from "../services/billing.js";
 
 const QUEUE_NAME = "renewal";
 
 export function startRenewalJob(): void {
-  const queue = new Queue(QUEUE_NAME, { connection: redis() });
+  const queue = new Queue(QUEUE_NAME, { connection: getRedisConnectionConfig() });
 
   // Repeatable job — every 60 seconds
   queue.add(
@@ -32,7 +32,7 @@ export function startRenewalJob(): void {
       await runRenewalCycle();
       console.log("[renewal] cycle done");
     },
-    { connection: redis() }
+    { connection: getRedisConnectionConfig() }
   );
 
   worker.on("failed", (job, err) => {

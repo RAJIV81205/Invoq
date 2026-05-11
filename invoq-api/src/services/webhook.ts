@@ -14,14 +14,14 @@ import { createHmac } from "crypto";
 import { eq } from "drizzle-orm";
 import { Queue } from "bullmq";
 import { db, webhookEndpoints, webhookDeliveries, newId, now } from "../lib/db/index.js";
-import { redis } from "../lib/cache/redis.js";
+import { getRedisConnectionConfig } from "../lib/cache/redis.js";
 import type { webhookEventEnum } from "../lib/db/schema.js";
 
 type WebhookEvent = typeof webhookEventEnum.enumValues[number];
 
 // BullMQ queue
 const webhookQueue = new Queue("webhook-delivery", {
-  connection: redis(),
+  connection: getRedisConnectionConfig(),
 });
 
 export async function fireWebhook(params: {

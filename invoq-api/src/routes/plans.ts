@@ -69,7 +69,12 @@ router.get(
   "/:planId",
   authenticate(["sk", "pk"]),
   asyncHandler(async (req, res) => {
-    const planId = BigInt(req.params.planId);
+    const planIdParam = req.params.planId;
+    if (!planIdParam || Array.isArray(planIdParam)) {
+      res.status(400).json({ error: "planId is required" });
+      return;
+    }
+    const planId = BigInt(planIdParam);
     const plan   = await getPlan(planId);
 
     if (!plan) {
@@ -95,7 +100,12 @@ router.patch(
   authenticate(),
   asyncHandler(async (req, res) => {
     const { developerAddress } = res.locals.auth;
-    const planId = BigInt(req.params.planId);
+    const planIdParam = req.params.planId;
+    if (!planIdParam || Array.isArray(planIdParam)) {
+      res.status(400).json({ error: "planId is required" });
+      return;
+    }
+    const planId = BigInt(planIdParam);
 
     const { name, priceUsdc, usageLimit, features } = req.body;
 
@@ -128,7 +138,12 @@ router.delete(
   authenticate(),
   asyncHandler(async (req, res) => {
     const { developerAddress } = res.locals.auth;
-    const planId = BigInt(req.params.planId);
+    const planIdParam = req.params.planId;
+    if (!planIdParam || Array.isArray(planIdParam)) {
+      res.status(400).json({ error: "planId is required" });
+      return;
+    }
+    const planId = BigInt(planIdParam);
 
     const result = await deactivatePlan(developerAddress!, planId);
 
@@ -147,7 +162,12 @@ router.post(
   authenticate(),
   asyncHandler(async (req, res) => {
     const { developerAddress } = res.locals.auth;
-    const planId = BigInt(req.params.planId);
+    const planIdParam = req.params.planId;
+    if (!planIdParam || Array.isArray(planIdParam)) {
+      res.status(400).json({ error: "planId is required" });
+      return;
+    }
+    const planId = BigInt(planIdParam);
 
     const result = await reactivatePlan(developerAddress!, planId);
 

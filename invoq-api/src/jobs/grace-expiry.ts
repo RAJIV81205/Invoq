@@ -6,13 +6,13 @@
  */
 
 import { Queue, Worker } from "bullmq";
-import { redis } from "../lib/cache/redis.js";
+import { getRedisConnectionConfig } from "../lib/cache/redis.js";
 import { runGraceExpiry } from "../services/billing.js";
 
 const QUEUE_NAME = "grace-expiry";
 
 export function startGraceExpiryJob(): void {
-  const queue = new Queue(QUEUE_NAME, { connection: redis() });
+  const queue = new Queue(QUEUE_NAME, { connection: getRedisConnectionConfig() });
 
   queue.add(
     "run",
@@ -31,7 +31,7 @@ export function startGraceExpiryJob(): void {
       await runGraceExpiry();
       console.log("[grace-expiry] done");
     },
-    { connection: redis() }
+    { connection: getRedisConnectionConfig() }
   );
 
   worker.on("failed", (job, err) => {

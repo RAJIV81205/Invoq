@@ -9,7 +9,7 @@
 
 import { Worker } from "bullmq";
 import { eq } from "drizzle-orm";
-import { redis } from "../lib/cache/redis.js";
+import { getRedisConnectionConfig } from "../lib/cache/redis.js";
 import { db, webhookDeliveries, now } from "../lib/db/index.js";
 
 const QUEUE_NAME    = "webhook-delivery";
@@ -80,7 +80,7 @@ export function startWebhookDeliveryWorker(): void {
         .where(eq(webhookDeliveries.id, deliveryId));
     },
     {
-      connection:  redis(),
+      connection:  getRedisConnectionConfig(),
       concurrency: 10,
     }
   );
