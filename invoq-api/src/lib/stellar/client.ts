@@ -121,12 +121,33 @@ export async function invokeContract<T = unknown>(
     const simResult = await rpc.simulateTransaction(txBuilder);
 
     if (SorobanRpc.Api.isSimulationError(simResult)) {
+      console.error('[Stellar] Simulation error:', {
+        contractId: opts.contractId,
+        method: opts.method,
+        error: simResult.error
+      });
       return {
         success: false,
         value: null,
         txHash: null,
         error: `Simulation failed: ${simResult.error}`,
       };
+    }
+
+    // Log diagnostic events from simulation (helpful for debugging contract issues)
+    if ('events' in simResult && simResult.events && simResult.events.length > 0) {
+      console.log('[Stellar] Simulation events:', {
+        contractId: opts.contractId,
+        method: opts.method,
+        eventCount: simResult.events.length,
+        events: simResult.events.map(e => {
+          const event = e.event();
+          return {
+            event: event.toXDR('base64'),
+            inSuccessfulContractCall: e.inSuccessfulContractCall,
+          };
+        })
+      });
     }
 
     if (SorobanRpc.Api.isSimulationRestore(simResult)) {
@@ -143,6 +164,12 @@ export async function invokeContract<T = unknown>(
     const sendResult = await rpc.sendTransaction(assembled);
 
     if (sendResult.status === "ERROR") {
+      console.error('[Stellar] Transaction submission error:', {
+        contractId: opts.contractId,
+        method: opts.method,
+        hash: sendResult.hash,
+        errorResult: sendResult.errorResult?.toXDR("base64")
+      });
       return {
         success: false,
         value: null,
@@ -155,6 +182,12 @@ export async function invokeContract<T = unknown>(
     const confirmed = await pollTransaction(sendResult.hash);
 
     if (!confirmed.success) {
+      console.error('[Stellar] Transaction confirmation failed:', {
+        contractId: opts.contractId,
+        method: opts.method,
+        hash: sendResult.hash,
+        error: confirmed.error
+      });
       return {
         success: false,
         value: null,
@@ -169,6 +202,12 @@ export async function invokeContract<T = unknown>(
 
     return { success: true, value: native, txHash: sendResult.hash, error: null };
   } catch (err) {
+    console.error('[Stellar] invokeContract exception:', {
+      contractId: opts.contractId,
+      method: opts.method,
+      error: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined
+    });
     return {
       success: false,
       value: null,
@@ -246,10 +285,61 @@ async function pollTransaction(
     }
 
     if (result.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
+      // Decode the XDR to get a readable error message
+      let errorMessage = "Transaction failed";
+      try {
+        if (result.resultXdr) {
+          const xdrString = typeof result.resultXdr === 'string' 
+            ? result.resultXdr 
+            : result.resultXdr.toXDR('base64');
+          
+          // Try to extract diagnostic info from the XDR
+          const txResult = xdr.TransactionResult.fromXDR(xdrString, 'base64');
+          const resultCode = txResult.result().switch().name;
+          
+          // Get operation-specific errors
+          let opErrors: string[] = [];
+          if (resultCode === 'txFailed') {
+            const results = txResult.result().results();
+            results.forEach((opResult, idx) => {
+              const opCode = opResult.tr().switch().name;
+              if (opCode === 'invokeHostFunction') {
+                const invokeResult = opResult.tr().invokeHostFunctionResult();
+                const invokeCode = invokeResult.switch().name;
+                opErrors.push(`Op ${idx}: ${invokeCode}`);
+                
+                // If it's a contract error, try to decode it
+                if (invokeCode === 'invokeHostFunctionTrapped' || 
+                    invokeCode === 'invokeHostFunctionResourceLimitExceeded') {
+                  opErrors.push(`  (Contract execution failed)`);
+                }
+              } else {
+                opErrors.push(`Op ${idx}: ${opCode}`);
+              }
+            });
+          }
+          
+          errorMessage = `Transaction failed: ${resultCode}`;
+          if (opErrors.length > 0) {
+            errorMessage += ` - ${opErrors.join(', ')}`;
+          }
+          
+          console.error('[Stellar] Transaction failed:', {
+            hash,
+            resultCode,
+            operationErrors: opErrors,
+            xdr: xdrString
+          });
+        }
+      } catch (decodeErr) {
+        console.error('[Stellar] Failed to decode error XDR:', decodeErr);
+        errorMessage = `Transaction failed: ${String(result.resultXdr)}`;
+      }
+      
       return {
         success: false,
         resultValue: null,
-        error: `Transaction failed: ${result.resultXdr}`,
+        error: errorMessage,
       };
     }
 

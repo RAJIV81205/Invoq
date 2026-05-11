@@ -84,11 +84,14 @@ export async function createPlan(params: {
   usageLimit: bigint;
   features: string[];
 }): Promise<{ planId: bigint | null; txHash: string | null; error: string | null }> {
+  // Use create_plan_for since the admin is signing on behalf of the developer
+  const admin = getAdminPublicKey();
   const result = await invokeContract<bigint>({
     contractId: CONTRACT_ID,
-    method: "create_plan",
+    method: "create_plan_for",
     args: [
-      toScAddress(params.owner),
+      toScAddress(admin),           // caller (admin)
+      toScAddress(params.owner),    // owner (developer)
       toScString(params.name),
       toScI128(params.priceUsdc),
       toScU64(params.intervalSeconds),
