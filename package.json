@@ -15,6 +15,7 @@
     "test": "bash scripts/test.sh"
   },
   "dependencies": {
+    "@stellar/freighter-api": "^6.0.1",
     "@stellar/stellar-sdk": "^15.1.0",
     "@types/pg": "^8.20.0",
     "@upstash/redis": "^1.38.0",

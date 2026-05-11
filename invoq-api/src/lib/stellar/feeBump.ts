@@ -1,28 +1,35 @@
 /**
- * src/lib/stellar/fee-bump.ts
+ * src/lib/stellar/feeBump.ts
  *
- * Fee sponsorship — Invoq pays all Stellar transaction fees on behalf of customers.
+ * Fee sponsorship — Invoq pays all Stellar transaction fees on behalf of developers/customers.
  *
- * How Stellar fee bumps work:
+ * How Stellar fee bumps work (CAP-0015):
  * ─────────────────────────────────────────────────────────────────────────────
- * A fee bump transaction wraps an inner transaction. The inner tx is signed
- * by the customer (their auth is required for initiate_subscription). The outer
+ * A fee-bump transaction wraps an inner transaction. The inner tx is signed
+ * by the developer/customer (their auth is required for contract calls). The outer
  * fee bump is signed by Invoq's admin account (the fee payer). Stellar processes
  * the inner tx but charges the fee to the outer payer.
  *
- * Result: customer pays ZERO XLM — they only need a Stellar wallet with USDC.
+ * Result: developer/customer pays ZERO XLM — they only need a Stellar wallet.
+ *
+ * Fee-bump validity rules (from Stellar docs):
+ *   - fee-bump total fee  >= inner tx total fee
+ *   - fee-bump total fee  >= network minimum × (innerOps + 1)
+ *   - fee-bump per-op fee  = totalFee / (innerOps + 1)   (what buildFeeBumpTransaction takes)
+ *
+ * For Soroban txs: inner tx fee = inclusion fee + resource fee (set by assembleTransaction).
+ * Static fees WILL cause "fee too small" rejections — we calculate dynamically.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  *
- * Flow for subscribe:
- *   1. Backend: buildSubscribeTx(customer, planId) → returns XDR string
- *   2. Frontend: customer signs the XDR with their wallet (Freighter etc.)
- *   3. Frontend sends signed XDR back to: POST /api/checkout/submit-tx
- *   4. Backend: wrapWithFeeBump(signedInnerXdr) → signs outer tx → submits
+ * Flow for developer-signed transactions:
+ *   1. Backend: buildXxxTxXdr(params) → returns unsigned XDR string
+ *   2. Frontend: developer signs with their wallet (Freighter etc.)
+ *   3. Frontend: POST /api/.../submit-tx  { signedXdr }
+ *   4. Backend:  wrapAndSubmit(signedXdr) → wraps in fee bump → signs → submits
  *
- * The customer's signature authorises the contract call.
- * Invoq's signature pays the fee.
- * Both are needed. Neither can fake the other.
+ * The developer's signature authorizes the contract call.
+ * Invoq's signature pays the fee. Neither can fake the other.
  */
 
 import {
@@ -30,6 +37,7 @@ import {
   Transaction,
   StrKey,
   BASE_FEE,
+  Contract,
 } from "@stellar/stellar-sdk";
 import { rpc as SorobanRpc } from "@stellar/stellar-sdk";
 import {
@@ -38,27 +46,289 @@ import {
   getNetworkPassphrase,
   toScAddress,
   toScU64,
+  toScString,
+  toScI128,
+  toScStringVec,
 } from "./client.js";
 
-// Fee paid by Invoq per sponsored transaction (in stroops)
-// 10x base fee = 1000 stroops = 0.0001 XLM = ~$0.00002 USD
-// Negligible cost per subscription, meaningful at millions of subscriptions.
-const SPONSORED_FEE = (Number(BASE_FEE) * 10).toString();
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-// ─── Build unsigned inner transaction ────────────────────────────────────────
+/**
+ * Minimum per-operation fee we set on inner transactions.
+ * 10× BASE_FEE = 1 000 stroops = 0.0001 XLM ≈ $0.00002.
+ * For Soroban, assembleTransaction adds resource fees on top; this is just the
+ * inclusion-fee floor.
+ */
+const MIN_INCLUSION_FEE_STROOPS = (Number(BASE_FEE) * 10).toString();
+
+/**
+ * Percentage headroom added to the computed fee-bump per-op fee.
+ * Provides cushion against minor surge-pricing spikes without over-spending.
+ */
+const FEE_BUMP_UPLIFT_PCT = 20n; // 20 %
+
+// ─── Fee-bump helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Compute the per-operation fee to use for a fee-bump transaction.
+ *
+ * Stellar rule: fee-bump total must be >= inner tx total fee.
+ *   fee-bump total = perOpFee × (innerOps + 1)
+ *   ∴  perOpFee ≥ ceil(innerFee / (innerOps + 1))
+ *
+ * We add FEE_BUMP_UPLIFT_PCT percent headroom and floor at MIN_INCLUSION_FEE_STROOPS.
+ */
+function computeFeeBumpPerOpFee(innerTx: Transaction): string {
+  const innerFeeSatoshis = BigInt(innerTx.fee);            // total fee in stroops
+  const innerOpsCount    = BigInt(innerTx.operations.length);
+  const totalOps         = innerOpsCount + 1n;             // +1 for the fee-bump itself
+
+  // ceil division: (a + b - 1) / b
+  const basePerOp = (innerFeeSatoshis + totalOps - 1n) / totalOps;
+
+  // Add uplift for surge-pricing headroom
+  const withUplift = (basePerOp * (100n + FEE_BUMP_UPLIFT_PCT)) / 100n;
+
+  // Never go below our inclusion-fee floor
+  const floor = BigInt(MIN_INCLUSION_FEE_STROOPS);
+  return (withUplift > floor ? withUplift : floor).toString();
+}
+
+// ─── Unsigned inner-tx builders ───────────────────────────────────────────────
+
+/**
+ * Builds an unsigned create_plan transaction XDR for the developer to sign.
+ */
+export async function buildPlanTxXdr(params: {
+  developerAddress: string;
+  name: string;
+  priceUsdc: bigint;
+  intervalSeconds: bigint;
+  trialSeconds: bigint;
+  usageLimit: bigint;
+  features: string[];
+}): Promise<{ xdr: string | null; error: string | null }> {
+  const rpc        = getRpc();
+  const passphrase = getNetworkPassphrase();
+  const contractId = process.env.SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS;
+
+  if (!contractId) {
+    return { xdr: null, error: "SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS not configured" };
+  }
+
+  try {
+    let developerAccount;
+    try {
+      developerAccount = await rpc.getAccount(params.developerAddress);
+    } catch {
+      return {
+        xdr: null,
+        error: "Developer Stellar account not found. Please fund your wallet first.",
+      };
+    }
+
+    const contract = new Contract(contractId);
+
+    const tx = new TransactionBuilder(developerAccount, {
+      fee:               MIN_INCLUSION_FEE_STROOPS,
+      networkPassphrase: passphrase,
+    })
+      .addOperation(
+        contract.call(
+          "create_plan",
+          toScAddress(params.developerAddress),
+          toScString(params.name),
+          toScI128(params.priceUsdc),
+          toScU64(params.intervalSeconds),
+          toScU64(params.trialSeconds),
+          toScU64(params.usageLimit),
+          toScStringVec(params.features)
+        )
+      )
+      .setTimeout(300)
+      .build();
+
+    const simResult = await rpc.simulateTransaction(tx);
+
+    if (SorobanRpc.Api.isSimulationError(simResult)) {
+      return {
+        xdr: null,
+        error: `Transaction simulation failed: ${simResult.error}`,
+      };
+    }
+
+    // assembleTransaction merges resource fees + footprint into the tx.
+    // After this, tx.fee = inclusion fee + resource fee.
+    const assembled = SorobanRpc.assembleTransaction(tx, simResult).build();
+    return { xdr: assembled.toXDR(), error: null };
+  } catch (err) {
+    return { xdr: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Builds an unsigned update_plan transaction XDR for the developer to sign.
+ */
+export async function buildUpdatePlanTxXdr(params: {
+  developerAddress: string;
+  planId: bigint;
+  name: string;
+  priceUsdc: bigint;
+  usageLimit: bigint;
+  features: string[];
+}): Promise<{ xdr: string | null; error: string | null }> {
+  const rpc        = getRpc();
+  const passphrase = getNetworkPassphrase();
+  const contractId = process.env.SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS;
+
+  if (!contractId) {
+    return { xdr: null, error: "SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS not configured" };
+  }
+
+  try {
+    let developerAccount;
+    try {
+      developerAccount = await rpc.getAccount(params.developerAddress);
+    } catch {
+      return { xdr: null, error: "Developer Stellar account not found." };
+    }
+
+    const contract = new Contract(contractId);
+
+    const tx = new TransactionBuilder(developerAccount, {
+      fee:               MIN_INCLUSION_FEE_STROOPS,
+      networkPassphrase: passphrase,
+    })
+      .addOperation(
+        contract.call(
+          "update_plan",
+          toScAddress(params.developerAddress),
+          toScU64(params.planId),
+          toScString(params.name),
+          toScI128(params.priceUsdc),
+          toScU64(params.usageLimit),
+          toScStringVec(params.features)
+        )
+      )
+      .setTimeout(300)
+      .build();
+
+    const simResult = await rpc.simulateTransaction(tx);
+    if (SorobanRpc.Api.isSimulationError(simResult)) {
+      return { xdr: null, error: `Transaction simulation failed: ${simResult.error}` };
+    }
+
+    const assembled = SorobanRpc.assembleTransaction(tx, simResult).build();
+    return { xdr: assembled.toXDR(), error: null };
+  } catch (err) {
+    return { xdr: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Builds an unsigned deactivate_plan transaction XDR for the developer to sign.
+ */
+export async function buildDeactivatePlanTxXdr(params: {
+  developerAddress: string;
+  planId: bigint;
+}): Promise<{ xdr: string | null; error: string | null }> {
+  const rpc        = getRpc();
+  const passphrase = getNetworkPassphrase();
+  const contractId = process.env.SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS;
+
+  if (!contractId) {
+    return { xdr: null, error: "SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS not configured" };
+  }
+
+  try {
+    let developerAccount;
+    try {
+      developerAccount = await rpc.getAccount(params.developerAddress);
+    } catch {
+      return { xdr: null, error: "Developer Stellar account not found." };
+    }
+
+    const contract = new Contract(contractId);
+
+    const tx = new TransactionBuilder(developerAccount, {
+      fee:               MIN_INCLUSION_FEE_STROOPS,
+      networkPassphrase: passphrase,
+    })
+      .addOperation(
+        contract.call(
+          "deactivate_plan",
+          toScAddress(params.developerAddress),
+          toScU64(params.planId)
+        )
+      )
+      .setTimeout(300)
+      .build();
+
+    const simResult = await rpc.simulateTransaction(tx);
+    if (SorobanRpc.Api.isSimulationError(simResult)) {
+      return { xdr: null, error: `Transaction simulation failed: ${simResult.error}` };
+    }
+
+    const assembled = SorobanRpc.assembleTransaction(tx, simResult).build();
+    return { xdr: assembled.toXDR(), error: null };
+  } catch (err) {
+    return { xdr: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Builds an unsigned reactivate_plan transaction XDR for the developer to sign.
+ */
+export async function buildReactivatePlanTxXdr(params: {
+  developerAddress: string;
+  planId: bigint;
+}): Promise<{ xdr: string | null; error: string | null }> {
+  const rpc        = getRpc();
+  const passphrase = getNetworkPassphrase();
+  const contractId = process.env.SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS;
+
+  if (!contractId) {
+    return { xdr: null, error: "SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS not configured" };
+  }
+
+  try {
+    let developerAccount;
+    try {
+      developerAccount = await rpc.getAccount(params.developerAddress);
+    } catch {
+      return { xdr: null, error: "Developer Stellar account not found." };
+    }
+
+    const contract = new Contract(contractId);
+
+    const tx = new TransactionBuilder(developerAccount, {
+      fee:               MIN_INCLUSION_FEE_STROOPS,
+      networkPassphrase: passphrase,
+    })
+      .addOperation(
+        contract.call(
+          "reactivate_plan",
+          toScAddress(params.developerAddress),
+          toScU64(params.planId)
+        )
+      )
+      .setTimeout(300)
+      .build();
+
+    const simResult = await rpc.simulateTransaction(tx);
+    if (SorobanRpc.Api.isSimulationError(simResult)) {
+      return { xdr: null, error: `Transaction simulation failed: ${simResult.error}` };
+    }
+
+    const assembled = SorobanRpc.assembleTransaction(tx, simResult).build();
+    return { xdr: assembled.toXDR(), error: null };
+  } catch (err) {
+    return { xdr: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
 
 /**
  * Builds an unsigned initiate_subscription transaction XDR for the customer to sign.
- *
- * The customer receives this XDR, signs it with their wallet, and returns
- * the signed XDR to the backend for fee bump wrapping and submission.
- *
- * The returned XDR includes:
- * - The contract call operation (BillingCycle.initiate_subscription)
- * - Simulated resource fees and footprint
- * - NOT yet signed by anyone
- *
- * @returns base64 XDR string of the unsigned inner transaction
  */
 export async function buildSubscribeTxXdr(
   customerAddress: string,
@@ -66,13 +336,13 @@ export async function buildSubscribeTxXdr(
 ): Promise<{ xdr: string | null; error: string | null }> {
   const rpc        = getRpc();
   const passphrase = getNetworkPassphrase();
-  const contractId = process.env.BILLING_CONTRACT_ID!;
+  const contractId = process.env.BILLING_CONTRACT_ID;
+
+  if (!contractId) {
+    return { xdr: null, error: "BILLING_CONTRACT_ID not configured" };
+  }
 
   try {
-    // We load the CUSTOMER's account to set the correct sequence number.
-    // The customer account must exist on Stellar (any account with XLM works).
-    // With fee sponsorship, customers just need a wallet — Freighter creates
-    // accounts automatically when the user receives any asset.
     let customerAccount;
     try {
       customerAccount = await rpc.getAccount(customerAddress);
@@ -83,11 +353,10 @@ export async function buildSubscribeTxXdr(
       };
     }
 
-    const { Contract } = await import("@stellar/stellar-sdk");
     const contract = new Contract(contractId);
 
     const tx = new TransactionBuilder(customerAccount, {
-      fee:               SPONSORED_FEE,
+      fee:               MIN_INCLUSION_FEE_STROOPS,
       networkPassphrase: passphrase,
     })
       .addOperation(
@@ -97,29 +366,18 @@ export async function buildSubscribeTxXdr(
           toScU64(planId)
         )
       )
-      .setTimeout(300) // 5 minutes for customer to sign
+      .setTimeout(300)
       .build();
 
-    // Simulate to get the resource fee footprint
     const simResult = await rpc.simulateTransaction(tx);
-
     if (SorobanRpc.Api.isSimulationError(simResult)) {
-      return {
-        xdr: null,
-        error: `Transaction simulation failed: ${simResult.error}`,
-      };
+      return { xdr: null, error: `Transaction simulation failed: ${simResult.error}` };
     }
 
-    // Assemble: fills in the soroban data (footprint, resource limits, auth)
     const assembled = SorobanRpc.assembleTransaction(tx, simResult).build();
-
-    // Return unsigned XDR — customer will sign this
     return { xdr: assembled.toXDR(), error: null };
   } catch (err) {
-    return {
-      xdr: null,
-      error: err instanceof Error ? err.message : String(err),
-    };
+    return { xdr: null, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -135,7 +393,11 @@ export async function buildCreateVaultTxXdr(params: {
 }): Promise<{ xdr: string | null; error: string | null }> {
   const rpc        = getRpc();
   const passphrase = getNetworkPassphrase();
-  const contractId = process.env.ESCROW_VAULT_CONTRACT_ID!;
+  const contractId = process.env.ESCROW_VAULT_CONTRACT_ID;
+
+  if (!contractId) {
+    return { xdr: null, error: "ESCROW_VAULT_CONTRACT_ID not configured" };
+  }
 
   try {
     let customerAccount;
@@ -145,20 +407,19 @@ export async function buildCreateVaultTxXdr(params: {
       return { xdr: null, error: "Customer Stellar account not found." };
     }
 
-    const { Contract } = await import("@stellar/stellar-sdk");
     const contract = new Contract(contractId);
     const { toScI128 } = await import("./client.js");
 
     const tx = new TransactionBuilder(customerAccount, {
-      fee:               SPONSORED_FEE,
+      fee:               MIN_INCLUSION_FEE_STROOPS,
       networkPassphrase: passphrase,
     })
       .addOperation(
         contract.call(
           "create_vault",
-          toScAddress(params.customerAddress),    // caller
-          toScAddress(params.customerAddress),    // customer
-          toScAddress(params.developerAddress),   // developer
+          toScAddress(params.customerAddress),
+          toScAddress(params.customerAddress),
+          toScAddress(params.developerAddress),
           toScI128(params.initialDeposit),
           toScI128(params.lowBalanceThreshold),
           toScI128(params.autoTopupAmount)
@@ -168,7 +429,6 @@ export async function buildCreateVaultTxXdr(params: {
       .build();
 
     const simResult = await rpc.simulateTransaction(tx);
-
     if (SorobanRpc.Api.isSimulationError(simResult)) {
       return { xdr: null, error: simResult.error };
     }
@@ -176,88 +436,156 @@ export async function buildCreateVaultTxXdr(params: {
     const assembled = SorobanRpc.assembleTransaction(tx, simResult).build();
     return { xdr: assembled.toXDR(), error: null };
   } catch (err) {
-    return {
-      xdr: null,
-      error: err instanceof Error ? err.message : String(err),
-    };
+    return { xdr: null, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
 // ─── Wrap and submit ──────────────────────────────────────────────────────────
 
 /**
- * Takes a customer-signed inner transaction XDR, wraps it in a fee bump
- * signed by Invoq's admin, and submits to Stellar.
+ * Takes a signed inner transaction XDR, wraps it in a fee-bump signed by
+ * Invoq's admin, and submits to Stellar.
  *
- * This is called by POST /api/checkout/submit-tx after the customer signs.
+ * Key production behaviour:
+ * - Fee is computed dynamically from the inner tx so it always satisfies
+ *   Stellar's validity constraint: fee-bump total >= inner tx total.
+ * - Optional signer verification prevents spoofed XDR submissions.
+ * - Polling uses exponential backoff with jitter to reduce RPC load.
  *
- * @param signedInnerXdr - base64 XDR of the customer-signed inner transaction
- * @returns txHash on success
+ * @param signedInnerXdr  Base64 XDR of the developer/customer-signed inner tx.
+ * @param expectedSigner  If provided, the inner tx must be signed by this address.
  */
 export async function wrapAndSubmit(
-  signedInnerXdr: string
+  signedInnerXdr: string,
+  expectedSigner?: string
 ): Promise<{ txHash: string | null; error: string | null }> {
   const rpc        = getRpc();
   const admin      = getAdminKeypair();
   const passphrase = getNetworkPassphrase();
 
   try {
-    // Deserialise the customer-signed inner transaction
-    const innerTx = new Transaction(signedInnerXdr, passphrase);
+    // ── 1. Deserialise inner tx ──────────────────────────────────────────────
+    let innerTx: Transaction;
+    try {
+      innerTx = new Transaction(signedInnerXdr, passphrase);
+    } catch (err) {
+      return { txHash: null, error: `Invalid XDR: ${err instanceof Error ? err.message : String(err)}` };
+    }
 
-    // Build the fee bump
+    // ── 2. Optional signer verification ─────────────────────────────────────
+    if (expectedSigner) {
+      const valid = verifyInnerTxSigner(signedInnerXdr, expectedSigner, passphrase);
+      if (!valid) {
+        return {
+          txHash: null,
+          error: `Inner transaction was not signed by expected address ${expectedSigner}`,
+        };
+      }
+    }
+
+    // ── 3. Compute fee-bump per-op fee dynamically ───────────────────────────
+    //
+    // Stellar rule (from CAP-0015 and docs):
+    //   fee-bump total fee >= inner tx total fee
+    //   fee-bump total fee  = perOpFee × (innerOps + 1)
+    //   ∴  perOpFee ≥ ceil(innerTx.fee / (innerOps + 1))
+    //
+    // For Soroban txs, innerTx.fee includes inclusion + resource fees (set by
+    // assembleTransaction). A static constant WILL fail here.
+    const perOpFee = computeFeeBumpPerOpFee(innerTx);
+
+    console.log("[FeeBump] Building fee-bump", {
+      innerFee:    innerTx.fee,
+      innerOps:    innerTx.operations.length,
+      perOpFee,
+      feePayer:    admin.publicKey(),
+    });
+
+    // ── 4. Build fee-bump transaction ────────────────────────────────────────
     const feeBump = TransactionBuilder.buildFeeBumpTransaction(
-      admin.publicKey(),  // fee payer = Invoq admin
-      SPONSORED_FEE,
-      innerTx,
+      admin.publicKey(), // fee payer (string public key)
+      perOpFee,          // per-operation fee for the outer tx
+      innerTx,           // signed inner transaction
       passphrase
     );
 
-    // Invoq signs the fee bump (pays the fee)
+    // ── 5. Sign fee-bump with admin keypair ──────────────────────────────────
     feeBump.sign(admin);
 
-    // Submit
+    // ── 6. Submit ────────────────────────────────────────────────────────────
+    console.log("[FeeBump] Submitting fee-bump transaction");
     const sendResult = await rpc.sendTransaction(feeBump);
 
     if (sendResult.status === "ERROR") {
+      const xdrErr = sendResult.errorResult?.toXDR("base64") ?? "unknown";
+      console.error("[FeeBump] Submission error:", { hash: sendResult.hash, xdrErr });
       return {
         txHash: sendResult.hash ?? null,
-        error:  `Submission failed: ${sendResult.errorResult?.toXDR("base64")}`,
+        error:  `Submission failed: ${xdrErr}`,
       };
     }
 
-    // Poll for confirmation
+    console.log("[FeeBump] Submitted, polling for confirmation:", sendResult.hash);
+
+    // ── 7. Poll with exponential backoff ─────────────────────────────────────
     const confirmed = await pollForConfirmation(sendResult.hash);
+
+    if (confirmed.error) {
+      console.error("[FeeBump] On-chain failure:", { hash: sendResult.hash, error: confirmed.error });
+    } else {
+      console.log("[FeeBump] Confirmed:", sendResult.hash);
+    }
+
     return confirmed;
   } catch (err) {
-    return {
-      txHash: null,
-      error:  err instanceof Error ? err.message : String(err),
-    };
+    console.error("[FeeBump] wrapAndSubmit exception:", err);
+    return { txHash: null, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
 // ─── Polling ──────────────────────────────────────────────────────────────────
 
+/**
+ * Poll for transaction confirmation using exponential backoff with jitter.
+ *
+ * Backoff schedule (approximate):
+ *   attempt 1:  1.0 s base + jitter
+ *   attempt 2:  1.5 s base + jitter
+ *   attempt 3:  2.25 s base + jitter
+ *   ...capped at MAX_INTERVAL_MS
+ */
 async function pollForConfirmation(
   hash: string,
-  maxAttempts = 20,
-  intervalMs  = 1500
+  maxAttempts   = 20,
+  baseIntervalMs = 1_000,
+  maxIntervalMs  = 8_000
 ): Promise<{ txHash: string; error: string | null }> {
   const rpc = getRpc();
 
   for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, intervalMs));
+    // Exponential backoff: base × 1.5^i, capped, plus up to 200 ms jitter
+    const backoff = Math.min(baseIntervalMs * 1.5 ** i, maxIntervalMs);
+    const jitter  = Math.random() * 200;
+    await sleep(backoff + jitter);
 
-    const result = await rpc.getTransaction(hash);
+    let result;
+    try {
+      result = await rpc.getTransaction(hash);
+    } catch (rpcErr) {
+      // Transient RPC error — keep trying
+      console.warn(`[FeeBump] getTransaction RPC error (attempt ${i + 1}):`, rpcErr);
+      continue;
+    }
 
     if (result.status === SorobanRpc.Api.GetTransactionStatus.SUCCESS) {
       return { txHash: hash, error: null };
     }
 
     if (result.status === SorobanRpc.Api.GetTransactionStatus.FAILED) {
-      return { txHash: hash, error: `Transaction failed on-chain` };
+      return { txHash: hash, error: "Transaction failed on-chain" };
     }
+
+    // MISSING = still in queue — keep polling
   }
 
   return {
@@ -266,11 +594,21 @@ async function pollForConfirmation(
   };
 }
 
-// ─── Helper: verify a transaction was signed by the expected address ──────────
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// ─── Signer verification ──────────────────────────────────────────────────────
 
 /**
- * Before wrapping in a fee bump, verify the inner tx was actually signed
- * by the expected customer address. Prevents malicious XDR submissions.
+ * Verify that the inner transaction was signed by `expectedSigner`.
+ *
+ * Uses the 4-byte key hint in each DecoratedSignature. This is a fast
+ * heuristic check — not a full cryptographic verify — but is sufficient to
+ * reject obviously spoofed XDR before hitting the RPC node.
+ *
+ * For production workloads that need full verification, use
+ * `Keypair.verify(txHash, signature)` with the decoded public key.
  */
 export function verifyInnerTxSigner(
   signedInnerXdr: string,
@@ -279,16 +617,11 @@ export function verifyInnerTxSigner(
 ): boolean {
   try {
     const tx = new Transaction(signedInnerXdr, passphrase);
-    const signatures = tx.signatures;
-
-    // Get the keypair's raw public key bytes for comparison
     const expectedRaw = StrKey.decodeEd25519PublicKey(expectedSigner);
+    const expectedHint = expectedRaw.slice(-4);
 
-    for (const sig of signatures) {
-      const hint = sig.hint();
-      // The hint is the last 4 bytes of the public key
-      const expectedHint = expectedRaw.slice(-4);
-      if (hint.equals(expectedHint)) {
+    for (const sig of tx.signatures) {
+      if (sig.hint().equals(expectedHint)) {
         return true;
       }
     }
