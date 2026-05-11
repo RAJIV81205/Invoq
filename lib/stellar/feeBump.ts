@@ -27,11 +27,8 @@
 
 import {
   TransactionBuilder,
-  FeeBumpTransaction,
   Transaction,
-  Networks,
-  Keypair,
-  xdr,
+  StrKey,
   BASE_FEE,
 } from "@stellar/stellar-sdk";
 import { rpc as SorobanRpc } from "@stellar/stellar-sdk";
@@ -39,7 +36,6 @@ import {
   getRpc,
   getAdminKeypair,
   getNetworkPassphrase,
-  invokeContract,
   toScAddress,
   toScU64,
 } from "./client";
@@ -68,8 +64,7 @@ export async function buildSubscribeTxXdr(
   customerAddress: string,
   planId: bigint
 ): Promise<{ xdr: string | null; error: string | null }> {
-  const rpc       = getRpc();
-  const admin     = getAdminKeypair();
+  const rpc        = getRpc();
   const passphrase = getNetworkPassphrase();
   const contractId = process.env.BILLING_CONTRACT_ID!;
 
@@ -287,7 +282,6 @@ export function verifyInnerTxSigner(
     const signatures = tx.signatures;
 
     // Get the keypair's raw public key bytes for comparison
-    const { StrKey } = require("@stellar/stellar-sdk");
     const expectedRaw = StrKey.decodeEd25519PublicKey(expectedSigner);
 
     for (const sig of signatures) {

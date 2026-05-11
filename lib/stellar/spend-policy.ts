@@ -9,7 +9,7 @@ import {
   simulateContract,
   toScAddress,
   toScI128,
-  toScBool,
+  toScU64,
   getAdminPublicKey,
 } from "./client";
 import { xdr } from "@stellar/stellar-sdk";
@@ -237,7 +237,7 @@ export async function getDailySpent(
   const result = await simulateContract<bigint>({
     contractId: CONTRACT_ID,
     method: "get_daily_spent",
-    args: [toScAddress(owner), { type: "u64", value: timestamp } as any],
+    args: [toScAddress(owner), toScU64(timestamp)],
   });
   return result.value ?? 0n;
 }
@@ -253,7 +253,7 @@ export async function getDailyLimitRemaining(
   const result = await simulateContract<bigint>({
     contractId: CONTRACT_ID,
     method: "get_daily_limit_remaining",
-    args: [toScAddress(owner), { type: "u64", value: timestamp } as any],
+    args: [toScAddress(owner), toScU64(timestamp)],
   });
   return result.value ?? BigInt(Number.MAX_SAFE_INTEGER);
 }

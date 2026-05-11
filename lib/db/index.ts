@@ -22,7 +22,6 @@ function env(key: string): string {
 // ─── Connection pool ──────────────────────────────────────────────────────────
 
 declare global {
-  // eslint-disable-next-line no-var
   var __pgPool: postgres.Sql | undefined;
 }
 

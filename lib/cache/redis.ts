@@ -11,7 +11,6 @@ import { Redis } from "@upstash/redis";
 // ─────────────────────────────────────────────────────────────────────────────
 
 declare global {
-  // eslint-disable-next-line no-var
   var __redis: Redis | undefined;
 }
 

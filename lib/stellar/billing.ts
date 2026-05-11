@@ -9,7 +9,6 @@ import {
   simulateContract,
   toScAddress,
   toScU64,
-  getAdminPublicKey,
 } from "./client";
 import { xdr } from "@stellar/stellar-sdk";
 import { BILLING_CYCLE_CONTRACT_ADDRESS } from "../config";

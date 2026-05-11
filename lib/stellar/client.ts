@@ -133,7 +133,6 @@ export async function invokeContract<T = unknown>(
       // Ledger entry needs restoration — submit the restore transaction first
       await handleRestore(simResult, keypair, stellarAccount);
       // Reload account after restore tx
-      const refreshedAccount = await rpc.getAccount(keypair.publicKey());
       return invokeContract({ ...opts, keypair });
     }
 
@@ -272,11 +271,6 @@ async function handleRestore(
   account: Account
 ): Promise<void> {
   const rpc = getRpc();
-
-  const restoreTx = new TransactionBuilder(account, {
-    fee: BASE_FEE,
-    networkPassphrase: NETWORK_PASSPHRASE,
-  });
 
   const restore = SorobanRpc.assembleTransaction(
     new TransactionBuilder(account, {
