@@ -43,23 +43,27 @@ export function redis(): Redis {
 /**
  * Get Redis connection config for BullMQ.
  * BullMQ expects ioredis-compatible connection options, not Upstash Redis client.
+ * 
+ * Note: Upstash provides two types of connections:
+ * 1. REST API (HTTPS) - used by @upstash/redis client
+ * 2. Native Redis protocol (rediss://) - required for BullMQ/ioredis
  */
 export function getRedisConnectionConfig() {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const redisUrl = process.env.UPSTASH_REDIS_URL;
 
-  if (!url || !token) {
-    throw new Error("Missing Redis environment variables");
+  if (!redisUrl) {
+    throw new Error("Missing UPSTASH_REDIS_URL environment variable. Get the native Redis URL from Upstash dashboard.");
   }
 
-  // Parse the Upstash REST URL to extract host and port
-  const urlObj = new URL(url);
+  // Parse the native Redis URL (rediss://default:password@host:port)
+  const urlObj = new URL(redisUrl);
   
   return {
     host: urlObj.hostname,
-    port: parseInt(urlObj.port || '443'),
-    password: token,
-    tls: urlObj.protocol === 'https:' ? {} : undefined,
+    port: parseInt(urlObj.port || '6379'),
+    password: urlObj.password,
+    username: urlObj.username || 'default',
+    tls: urlObj.protocol === 'rediss:' ? {} : undefined,
   };
 }
 
