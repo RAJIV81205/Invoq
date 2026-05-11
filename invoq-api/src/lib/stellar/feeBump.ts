@@ -38,7 +38,7 @@ import {
   getNetworkPassphrase,
   toScAddress,
   toScU64,
-} from "./client";
+} from "./client.js";
 
 // Fee paid by Invoq per sponsored transaction (in stroops)
 // 10x base fee = 1000 stroops = 0.0001 XLM = ~$0.00002 USD
@@ -147,7 +147,7 @@ export async function buildCreateVaultTxXdr(params: {
 
     const { Contract } = await import("@stellar/stellar-sdk");
     const contract = new Contract(contractId);
-    const { toScI128 } = await import("./client");
+    const { toScI128 } = await import("./client.js");
 
     const tx = new TransactionBuilder(customerAccount, {
       fee:               SPONSORED_FEE,

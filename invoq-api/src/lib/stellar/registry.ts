@@ -18,9 +18,9 @@ import {
   toScBool,
   toScStringVec,
   getAdminPublicKey,
-} from "./client";
+} from "./client.js";
 import { xdr } from "@stellar/stellar-sdk";
-import { SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS } from "../config";
+import { SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS } from "../../config.js";
 
 const CONTRACT_ID = SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS!;
 

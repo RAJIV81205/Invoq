@@ -9,9 +9,9 @@ import {
   simulateContract,
   toScAddress,
   toScU64,
-} from "./client";
+} from "./client.js";
 import { xdr } from "@stellar/stellar-sdk";
-import { BILLING_CYCLE_CONTRACT_ADDRESS } from "../config";
+import { BILLING_CYCLE_CONTRACT_ADDRESS } from "../../config.js";
 
 const CONTRACT_ID = BILLING_CYCLE_CONTRACT_ADDRESS!;
 

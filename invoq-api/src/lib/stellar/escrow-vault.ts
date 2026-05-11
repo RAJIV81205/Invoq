@@ -19,8 +19,8 @@ import {
   toScI128,
   toScString,
   getAdminPublicKey,
-} from "./client";
-import { ESCROW_VAULT_CONTRACT_ADDRESS } from "../config";
+} from "./client.js";
+import { ESCROW_VAULT_CONTRACT_ADDRESS } from "../../config.js";
 
 const CONTRACT_ID = ESCROW_VAULT_CONTRACT_ADDRESS!;
 

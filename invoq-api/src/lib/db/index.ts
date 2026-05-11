@@ -11,7 +11,7 @@
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import * as schema from "./schema";
+import * as schema from "./schema.js";
 
 function env(key: string): string {
   const val = process.env[key];
@@ -42,7 +42,7 @@ export const db = drizzle(getPool(), { schema });
 
 // ─── Re-export schema for convenience ────────────────────────────────────────
 
-export * from "./schema";
+export * from "./schema.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

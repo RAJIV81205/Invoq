@@ -11,9 +11,9 @@ import {
   toScI128,
   toScU64,
   getAdminPublicKey,
-} from "./client";
+} from "./client.js";
 import { xdr } from "@stellar/stellar-sdk";
-import { SPEND_POLICY_CONTRACT_ADDRESS } from "../config";
+import { SPEND_POLICY_CONTRACT_ADDRESS } from "../../config.js";
 
 const CONTRACT_ID = SPEND_POLICY_CONTRACT_ADDRESS!;
 
