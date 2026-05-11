@@ -272,9 +272,19 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
       })
     );
     subscribeXdr = r.data?.xdr ?? null;
-    report(s2, subscribeXdr
-      ? pass("Build subscribe tx XDR", `${subscribeXdr.length} chars`, undefined, ms)
-      : fail("Build subscribe tx XDR", r.error ?? "No XDR"));
+    
+    // Check if already subscribed
+    if (
+      r.error &&
+      (r.error.includes("AlreadySubscribed") ||
+        r.error.includes("Error(Contract, #41)"))
+    ) {
+      report(s2, skip("Build subscribe tx XDR", "Customer already has active subscription"));
+    } else {
+      report(s2, subscribeXdr
+        ? pass("Build subscribe tx XDR", `${subscribeXdr.length} chars`, undefined, ms)
+        : fail("Build subscribe tx XDR", r.error ?? "No XDR"));
+    }
   } else {
     report(s2, skip("Build subscribe tx", "no freePlanId"));
   }
@@ -299,7 +309,7 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
       report(s2, fail("Sign + submit subscribe tx", e.message));
     }
   } else {
-    report(s2, skip("Sign subscribe tx", "no XDR"));
+    report(s2, skip("Sign subscribe tx", "no XDR or already subscribed"));
   }
 
   // Bad signature → 400
@@ -315,6 +325,7 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
   }
 
   // Build vault tx
+  let vaultXdr: string | null = null;
   {
     const { result: r, ms } = await timed(() =>
       api("POST", "/v1/checkout/build-vault-tx", {
@@ -325,9 +336,36 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
         autoTopupAmount: 0,
       })
     );
-    report(s2, r.data?.xdr
-      ? pass("Build vault creation tx XDR", `${r.data.xdr.length} chars`, undefined, ms)
-      : fail("Build vault creation tx XDR", r.error ?? "No XDR"));
+    vaultXdr = r.data?.xdr ?? null;
+    if (r.error && r.error.includes("Error(Contract, #20)")) {
+      report(s2, skip("Build vault creation tx XDR", "Vault already exists"));
+    } else {
+      report(s2, vaultXdr
+        ? pass("Build vault creation tx XDR", `${vaultXdr.length} chars`, undefined, ms)
+        : fail("Build vault creation tx XDR", r.error ?? "No XDR"));
+    }
+  }
+
+  // Sign + submit vault tx
+  if (vaultXdr) {
+    try {
+      const signed = await signXdr(vaultXdr, NETWORK_PASSPHRASE);
+      report(s2, pass("Developer signed vault tx with Freighter"));
+
+      const { result: submitRes, ms } = await timed(() =>
+        api("POST", "/v1/checkout/submit-vault-tx", {
+          signedXdr: signed,
+          customerAddress: developerAddress,
+        })
+      );
+      report(s2, submitRes.data?.txHash
+        ? pass("Submit vault creation tx", undefined, submitRes.data.txHash, ms)
+        : fail("Submit vault creation tx", submitRes.error ?? "No txHash"));
+    } catch (e: any) {
+      report(s2, fail("Sign + submit vault tx", e.message));
+    }
+  } else {
+    report(s2, skip("Sign vault tx", "no XDR or vault already exists"));
   }
 
   // ── Section 3: Entitlement ────────────────────────────────────────────────
@@ -423,10 +461,18 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
   }
 
   {
-    const r = await api("DELETE", `/v1/subscriptions/${developerAddress}`, { immediate: false });
-    report(s5, r.data?.txHash
-      ? pass("Cancel subscription (end of period)", undefined, r.data.txHash)
-      : skip("Cancel subscription", r.error ?? "no active sub"));
+    const { result: r, ms } = await timed(() =>
+      api("DELETE", `/v1/subscriptions/${developerAddress}`, { immediate: false })
+    );
+    
+    // Check if already cancelled or other error
+    if (r.error && (r.error.includes("AlreadyCancelled") || r.error.includes("terminal"))) {
+      report(s5, skip("Cancel subscription", "Already cancelled or in terminal state"));
+    } else {
+      report(s5, r.data?.txHash
+        ? pass("Cancel subscription (end of period)", undefined, r.data.txHash, ms)
+        : fail("Cancel subscription", r.error ?? "no txHash"));
+    }
   }
 
   // ── Section 6: Vault ──────────────────────────────────────────────────────
@@ -439,12 +485,17 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
       : fail("Missing developer param → 400", `Got ${r.status}`));
   }
 
+  // Check if vault exists (should exist after Section 2)
+  let vaultExists = false;
   {
-    const r = await api("GET", `/v1/vault?customer=${developerAddress}&developer=${developerAddress}`);
-    report(s6, r.status === 404
-      ? pass("Non-existent vault → 404")
-      : r.data
-        ? pass("Vault exists", `balance: ${r.data.balance_usdc}`)
+    const { result: r, ms } = await timed(() =>
+      api("GET", `/v1/vault?customer=${developerAddress}&developer=${developerAddress}`)
+    );
+    vaultExists = r.status === 200 && r.data !== null;
+    report(s6, vaultExists
+      ? pass("Vault exists", `balance: ${r.data.balance_usdc}`, undefined, ms)
+      : r.status === 404
+        ? skip("Vault check", "Vault not created yet")
         : fail("Vault check", r.error ?? ""));
   }
 
@@ -455,6 +506,23 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
       : fail("Debit missing fields → 400", `Got ${r.status}`));
   }
 
+  // Test real vault debit (if vault exists)
+  if (vaultExists) {
+    const { result: r, ms } = await timed(() =>
+      api("POST", "/v1/vault/debit", {
+        customer: developerAddress,
+        developer: developerAddress,
+        amount: 100000,
+        usageDescription: "Test debit for API usage",
+      })
+    );
+    report(s6, r.data?.txHash
+      ? pass("Debit vault 0.1 USDC", `remaining: ${r.data.remainingBalance}`, r.data.txHash, ms)
+      : fail("Debit vault", r.error ?? "No txHash"));
+  } else {
+    report(s6, skip("Debit vault", "no vault"));
+  }
+
   {
     const r = await api("POST", "/v1/vault/withdraw", { customer: developerAddress });
     report(s6, r.status === 400
@@ -462,11 +530,78 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
       : fail("Withdraw missing fields → 400", `Got ${r.status}`));
   }
 
+  // Test real vault withdraw with customer-signed fee-bump flow (if vault exists)
+  if (vaultExists) {
+    const { result: buildRes, ms } = await timed(() =>
+      api("POST", "/v1/vault/build-withdraw-tx", {
+        customerAddress: developerAddress,
+        developerAddress,
+        amount: 50000,
+      })
+    );
+
+    if (buildRes.error || !buildRes.data?.xdr) {
+      report(s6, fail("Build withdraw tx XDR", buildRes.error ?? "No XDR returned"));
+    } else {
+      report(s6, pass("Build withdraw tx XDR", `XDR length: ${buildRes.data.xdr.length}`, undefined, ms));
+      try {
+        const signedXdr = await signXdr(buildRes.data.xdr, NETWORK_PASSPHRASE);
+        report(s6, pass("Customer signed withdraw tx with Freighter"));
+
+        const submitRes = await api("POST", "/v1/vault/submit-withdraw-tx", {
+          signedXdr,
+          customerAddress: developerAddress,
+        });
+        report(s6, submitRes.data?.txHash
+          ? pass("Submit withdraw tx", undefined, submitRes.data.txHash)
+          : fail("Submit withdraw tx", submitRes.error ?? "No txHash"));
+      } catch (e: any) {
+        report(s6, fail("Customer signed withdraw tx", e.message));
+      }
+    }
+  } else {
+    report(s6, skip("Withdraw from vault", "no vault"));
+  }
+
   {
     const r = await api("PATCH", "/v1/vault/threshold", { customer: developerAddress });
     report(s6, r.status === 400
       ? pass("Threshold missing fields → 400")
       : fail("Threshold missing fields → 400", `Got ${r.status}`));
+  }
+
+  // Test real threshold update with customer-signed fee-bump flow (if vault exists)
+  if (vaultExists) {
+    const { result: buildRes, ms } = await timed(() =>
+      api("POST", "/v1/vault/build-threshold-tx", {
+        customerAddress: developerAddress,
+        developerAddress,
+        newThreshold: 2000000,
+        newAutoTopup: 0,
+      })
+    );
+
+    if (buildRes.error || !buildRes.data?.xdr) {
+      report(s6, fail("Build threshold update tx XDR", buildRes.error ?? "No XDR returned"));
+    } else {
+      report(s6, pass("Build threshold update tx XDR", `XDR length: ${buildRes.data.xdr.length}`, undefined, ms));
+      try {
+        const signedXdr = await signXdr(buildRes.data.xdr, NETWORK_PASSPHRASE);
+        report(s6, pass("Customer signed threshold update tx with Freighter"));
+
+        const submitRes = await api("POST", "/v1/vault/submit-threshold-tx", {
+          signedXdr,
+          customerAddress: developerAddress,
+        });
+        report(s6, submitRes.data?.txHash
+          ? pass("Submit threshold update tx", undefined, submitRes.data.txHash)
+          : fail("Submit threshold update tx", submitRes.error ?? "No txHash"));
+      } catch (e: any) {
+        report(s6, fail("Customer signed threshold update tx", e.message));
+      }
+    }
+  } else {
+    report(s6, skip("Update vault threshold", "no vault"));
   }
 
   // ── Section 7: Webhooks ───────────────────────────────────────────────────

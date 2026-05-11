@@ -6,10 +6,12 @@
  */
 
 import { Router } from "express";
+import { StrKey } from "@stellar/stellar-sdk";
 import { authenticate } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/error.js";
 import { getSubscription, cancelSubscription } from "../lib/stellar/registry.js";
 import { invalidateEntitlementCache } from "../lib/cache/redis.js";
+import { getAdminPublicKey } from "../lib/stellar/client.js";
 
 const router = Router();
 
@@ -21,6 +23,10 @@ router.get(
     const customerAddress = req.params.customerAddress;
     if (!customerAddress || Array.isArray(customerAddress)) {
       res.status(400).json({ error: "customerAddress is required" });
+      return;
+    }
+    if (!StrKey.isValidEd25519PublicKey(customerAddress)) {
+      res.status(400).json({ error: "Invalid Stellar address" });
       return;
     }
     const sub = await getSubscription(customerAddress);
@@ -48,21 +54,40 @@ router.delete(
   "/:customerAddress",
   authenticate(),
   asyncHandler(async (req, res) => {
-    const { developerAddress } = res.locals.auth;
     const customerAddress = req.params.customerAddress;
     if (!customerAddress || Array.isArray(customerAddress)) {
       res.status(400).json({ error: "customerAddress is required" });
       return;
     }
+    if (!StrKey.isValidEd25519PublicKey(customerAddress)) {
+      res.status(400).json({ error: "Invalid Stellar address" });
+      return;
+    }
     const immediate = req.body?.immediate === true;
 
+    // This route is backend-admin mediated, so the on-chain caller must be admin.
+    const caller = getAdminPublicKey();
     const result = await cancelSubscription({
-      caller:    developerAddress!,
+      caller,
       customer:  customerAddress,
       immediate,
     });
 
     if (result.error) {
+      // Testnet occasionally confirms late; return pending with hash instead of hard failure.
+      if (
+        result.txHash &&
+        result.error.includes("Transaction not confirmed after")
+      ) {
+        await invalidateEntitlementCache(customerAddress);
+        res.status(202).json({
+          txHash: result.txHash,
+          immediate,
+          pending: true,
+          warning: result.error,
+        });
+        return;
+      }
       res.status(502).json({ error: result.error });
       return;
     }

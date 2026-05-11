@@ -11,6 +11,9 @@
  *
  * POST /v1/checkout/build-vault-tx
  *   → Builds unsigned create_vault XDR for customer to sign.
+ *
+ * POST /v1/checkout/submit-vault-tx
+ *   → Receives customer-signed vault creation XDR, wraps in fee bump, submits to Stellar.
  */
 
 import { Router } from "express";
@@ -90,14 +93,14 @@ router.post(
         .insert(subscriptionCache)
         .values({
           customerAddress,
-          planId:             BigInt(planId),
+          planId:             Number(planId),
           developerId:        res.locals.auth.developerId!,
           developerAddress,
           status:             sub.status,
           currentPeriodStart: fromUnixSeconds(sub.current_period_start),
           currentPeriodEnd:   fromUnixSeconds(sub.current_period_end),
           cancelAtPeriodEnd:  sub.cancel_at_period_end,
-          usageCurrent:       sub.usage_current,
+          usageCurrent:       Number(sub.usage_current),
           syncedAt:           now(),
         })
         .onConflictDoUpdate({
@@ -106,7 +109,7 @@ router.post(
             status:             sub.status,
             currentPeriodStart: fromUnixSeconds(sub.current_period_start),
             currentPeriodEnd:   fromUnixSeconds(sub.current_period_end),
-            usageCurrent:       sub.usage_current,
+            usageCurrent:       Number(sub.usage_current),
             syncedAt:           now(),
           },
         });
@@ -154,6 +157,38 @@ router.post(
     }
 
     res.json({ xdr: result.xdr });
+  })
+);
+
+// POST /v1/checkout/submit-vault-tx
+// body: { signedXdr: string, customerAddress: string }
+router.post(
+  "/submit-vault-tx",
+  authenticate(["sk", "pk"]),
+  asyncHandler(async (req, res) => {
+    const { signedXdr, customerAddress } = req.body;
+
+    if (!signedXdr || !customerAddress) {
+      res.status(400).json({ error: "signedXdr, customerAddress required" });
+      return;
+    }
+
+    // Verify inner tx was actually signed by the customer
+    const passphrase = getNetworkPassphrase();
+    const signerValid = verifyInnerTxSigner(signedXdr, customerAddress, passphrase);
+    if (!signerValid) {
+      res.status(400).json({ error: "Transaction signature does not match customerAddress" });
+      return;
+    }
+
+    const result = await wrapAndSubmit(signedXdr);
+
+    if (result.error) {
+      res.status(502).json({ error: result.error });
+      return;
+    }
+
+    res.json({ txHash: result.txHash });
   })
 );
 

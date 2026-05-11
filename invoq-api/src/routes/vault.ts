@@ -13,12 +13,18 @@ import { authenticate } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/error.js";
 import {
   getVault,
-  getBalance,
   debitVault,
   withdraw,
   closeVault,
   updateThreshold,
 } from "../lib/stellar/escrow-vault.js";
+import {
+  buildWithdrawVaultTxXdr,
+  buildUpdateVaultThresholdTxXdr,
+  wrapAndSubmit,
+  verifyInnerTxSigner,
+} from "../lib/stellar/feeBump.js";
+import { getNetworkPassphrase } from "../lib/stellar/client.js";
 
 const router = Router();
 
@@ -121,6 +127,65 @@ router.post(
   })
 );
 
+// POST /v1/vault/build-withdraw-tx
+// body: { customerAddress, developerAddress, amount }
+router.post(
+  "/build-withdraw-tx",
+  authenticate(["sk", "pk"]),
+  asyncHandler(async (req, res) => {
+    const { customerAddress, developerAddress, amount } = req.body;
+
+    if (!customerAddress || !developerAddress || amount === undefined) {
+      res.status(400).json({ error: "customerAddress, developerAddress, amount required" });
+      return;
+    }
+
+    const result = await buildWithdrawVaultTxXdr({
+      customerAddress,
+      developerAddress,
+      amount: BigInt(amount),
+    });
+
+    if (result.error) {
+      res.status(502).json({ error: result.error });
+      return;
+    }
+
+    res.json({ xdr: result.xdr });
+  })
+);
+
+// POST /v1/vault/submit-withdraw-tx
+// body: { signedXdr, customerAddress }
+router.post(
+  "/submit-withdraw-tx",
+  authenticate(["sk", "pk"]),
+  asyncHandler(async (req, res) => {
+    const { signedXdr, customerAddress } = req.body;
+
+    if (!signedXdr || !customerAddress) {
+      res.status(400).json({ error: "signedXdr, customerAddress required" });
+      return;
+    }
+
+    const passphrase = getNetworkPassphrase();
+    const signerValid = verifyInnerTxSigner(signedXdr, customerAddress, passphrase);
+    if (!signerValid) {
+      res.status(400).json({ error: "Transaction signature does not match customerAddress" });
+      return;
+    }
+
+    const result = await wrapAndSubmit(signedXdr);
+
+    if (result.error) {
+      res.status(502).json({ error: result.error });
+      return;
+    }
+
+    res.json({ txHash: result.txHash });
+  })
+);
+
 // DELETE /v1/vault
 // body: { caller, customer, developer }
 router.delete(
@@ -168,6 +233,68 @@ router.patch(
       newThreshold: BigInt(newThreshold),
       newAutoTopup: BigInt(newAutoTopup ?? 0),
     });
+
+    if (result.error) {
+      res.status(502).json({ error: result.error });
+      return;
+    }
+
+    res.json({ txHash: result.txHash });
+  })
+);
+
+// POST /v1/vault/build-threshold-tx
+// body: { customerAddress, developerAddress, newThreshold, newAutoTopup? }
+router.post(
+  "/build-threshold-tx",
+  authenticate(["sk", "pk"]),
+  asyncHandler(async (req, res) => {
+    const { customerAddress, developerAddress, newThreshold, newAutoTopup } = req.body;
+
+    if (!customerAddress || !developerAddress || newThreshold === undefined) {
+      res.status(400).json({
+        error: "customerAddress, developerAddress, newThreshold required",
+      });
+      return;
+    }
+
+    const result = await buildUpdateVaultThresholdTxXdr({
+      customerAddress,
+      developerAddress,
+      newThreshold: BigInt(newThreshold),
+      newAutoTopup: BigInt(newAutoTopup ?? 0),
+    });
+
+    if (result.error) {
+      res.status(502).json({ error: result.error });
+      return;
+    }
+
+    res.json({ xdr: result.xdr });
+  })
+);
+
+// POST /v1/vault/submit-threshold-tx
+// body: { signedXdr, customerAddress }
+router.post(
+  "/submit-threshold-tx",
+  authenticate(["sk", "pk"]),
+  asyncHandler(async (req, res) => {
+    const { signedXdr, customerAddress } = req.body;
+
+    if (!signedXdr || !customerAddress) {
+      res.status(400).json({ error: "signedXdr, customerAddress required" });
+      return;
+    }
+
+    const passphrase = getNetworkPassphrase();
+    const signerValid = verifyInnerTxSigner(signedXdr, customerAddress, passphrase);
+    if (!signerValid) {
+      res.status(400).json({ error: "Transaction signature does not match customerAddress" });
+      return;
+    }
+
+    const result = await wrapAndSubmit(signedXdr);
 
     if (result.error) {
       res.status(502).json({ error: result.error });

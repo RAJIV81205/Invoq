@@ -440,6 +440,116 @@ export async function buildCreateVaultTxXdr(params: {
   }
 }
 
+/**
+ * Builds an unsigned withdraw transaction XDR for the customer to sign.
+ */
+export async function buildWithdrawVaultTxXdr(params: {
+  customerAddress: string;
+  developerAddress: string;
+  amount: bigint;
+}): Promise<{ xdr: string | null; error: string | null }> {
+  const rpc        = getRpc();
+  const passphrase = getNetworkPassphrase();
+  const contractId = process.env.ESCROW_VAULT_CONTRACT_ID;
+
+  if (!contractId) {
+    return { xdr: null, error: "ESCROW_VAULT_CONTRACT_ID not configured" };
+  }
+
+  try {
+    let customerAccount;
+    try {
+      customerAccount = await rpc.getAccount(params.customerAddress);
+    } catch {
+      return { xdr: null, error: "Customer Stellar account not found." };
+    }
+
+    const contract = new Contract(contractId);
+
+    const tx = new TransactionBuilder(customerAccount, {
+      fee:               MIN_INCLUSION_FEE_STROOPS,
+      networkPassphrase: passphrase,
+    })
+      .addOperation(
+        contract.call(
+          "withdraw",
+          toScAddress(params.customerAddress),
+          toScAddress(params.customerAddress),
+          toScAddress(params.developerAddress),
+          toScI128(params.amount)
+        )
+      )
+      .setTimeout(300)
+      .build();
+
+    const simResult = await rpc.simulateTransaction(tx);
+    if (SorobanRpc.Api.isSimulationError(simResult)) {
+      return { xdr: null, error: simResult.error };
+    }
+
+    const assembled = SorobanRpc.assembleTransaction(tx, simResult).build();
+    return { xdr: assembled.toXDR(), error: null };
+  } catch (err) {
+    return { xdr: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Builds an unsigned update_threshold transaction XDR for the customer to sign.
+ */
+export async function buildUpdateVaultThresholdTxXdr(params: {
+  customerAddress: string;
+  developerAddress: string;
+  newThreshold: bigint;
+  newAutoTopup: bigint;
+}): Promise<{ xdr: string | null; error: string | null }> {
+  const rpc        = getRpc();
+  const passphrase = getNetworkPassphrase();
+  const contractId = process.env.ESCROW_VAULT_CONTRACT_ID;
+
+  if (!contractId) {
+    return { xdr: null, error: "ESCROW_VAULT_CONTRACT_ID not configured" };
+  }
+
+  try {
+    let customerAccount;
+    try {
+      customerAccount = await rpc.getAccount(params.customerAddress);
+    } catch {
+      return { xdr: null, error: "Customer Stellar account not found." };
+    }
+
+    const contract = new Contract(contractId);
+
+    const tx = new TransactionBuilder(customerAccount, {
+      fee:               MIN_INCLUSION_FEE_STROOPS,
+      networkPassphrase: passphrase,
+    })
+      .addOperation(
+        contract.call(
+          "update_threshold",
+          toScAddress(params.customerAddress),
+          toScAddress(params.customerAddress),
+          toScAddress(params.developerAddress),
+          toScI128(params.newThreshold),
+          toScI128(params.newAutoTopup)
+        )
+      )
+      .setTimeout(300)
+      .build();
+
+    const simResult = await rpc.simulateTransaction(tx);
+    if (SorobanRpc.Api.isSimulationError(simResult)) {
+      return { xdr: null, error: simResult.error };
+    }
+
+    const assembled = SorobanRpc.assembleTransaction(tx, simResult).build();
+    return { xdr: assembled.toXDR(), error: null };
+  } catch (err) {
+    return { xdr: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 // ─── Wrap and submit ──────────────────────────────────────────────────────────
 
 /**
@@ -556,9 +666,9 @@ export async function wrapAndSubmit(
  */
 async function pollForConfirmation(
   hash: string,
-  maxAttempts   = 20,
+  maxAttempts   = 40,
   baseIntervalMs = 1_000,
-  maxIntervalMs  = 8_000
+  maxIntervalMs  = 10_000
 ): Promise<{ txHash: string; error: string | null }> {
   const rpc = getRpc();
 
