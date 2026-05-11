@@ -1,25 +1,6 @@
-/**
- * src/services/billing.ts
- *
- * Orchestrates the renewal cycle:
- *   1. Query subscriptionCache for due renewals
- *   2. Call processRenewals on BillingCycle contract (max 30 per batch)
- *   3. Fire payment.renewed or payment.failed webhooks
- *   4. Update subscriptionCache rows
- *
- * And grace expiry:
- *   1. Get grace period customers from Redis
- *   2. Call expireGracePeriods on BillingCycle contract
- *   3. Fire subscription.cancelled webhooks
- *   4. Invalidate entitlement cache
- */
-
-import { lt, eq, inArray } from "drizzle-orm";
+import { lt, eq } from "drizzle-orm";
 import { db, subscriptionCache, now } from "../lib/db/index.js";
-import {
-  processRenewals,
-  expireGracePeriods,
-} from "../lib/stellar/billing.js";
+import { processRenewals, expireGracePeriods } from "../lib/stellar/billing.js";
 import {
   getGracePeriodCustomers,
   clearGracePeriod,
@@ -28,59 +9,100 @@ import {
 import { fireWebhook } from "./webhook.js";
 import { getSubscription } from "../lib/stellar/registry.js";
 import { fromUnixSeconds } from "../lib/db/index.js";
+import { createLogger } from "../lib/logger.js";
 
-const RENEWAL_BATCH_SIZE = 30;
-const GRACE_BATCH_SIZE   = 50;
+const log             = createLogger("billing");
+const RENEWAL_BATCH   = 30;
+const GRACE_BATCH     = 50;
 
-// ─── Renewal ──────────────────────────────────────────────────────────────────
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Renewal cycle — called every 60s by the renewal job
+// ─────────────────────────────────────────────────────────────────────────────
 export async function runRenewalCycle(): Promise<void> {
-  // Find all subscriptions whose period has ended
+  const cycleStart = Date.now();
+
   const due = await db
     .select()
     .from(subscriptionCache)
     .where(lt(subscriptionCache.currentPeriodEnd, now()));
 
-  if (due.length === 0) return;
+  if (due.length === 0) {
+    log.debug("renewal cycle: no subscriptions due");
+    return;
+  }
 
-  // Batch into groups of 30
-  for (let i = 0; i < due.length; i += RENEWAL_BATCH_SIZE) {
-    const batch = due.slice(i, i + RENEWAL_BATCH_SIZE);
+  log.info("renewal cycle: subscriptions due", { count: due.length });
+
+  let renewed       = 0;
+  let failed        = 0;
+  let contractErrors = 0;
+
+  for (let i = 0; i < due.length; i += RENEWAL_BATCH) {
+    const batch     = due.slice(i, i + RENEWAL_BATCH);
     const customers = batch.map((r) => r.customerAddress);
+    const batchIdx  = Math.floor(i / RENEWAL_BATCH) + 1;
+
+    log.info("renewal batch: submitting", {
+      batch:     batchIdx,
+      customers: customers.length,
+      addresses: customers,
+    });
 
     const result = await processRenewals(customers);
 
     if (result.error) {
-      console.error("[billing] processRenewals error:", result.error);
+      log.error("renewal batch: contract call failed", {
+        batch:  batchIdx,
+        error:  result.error,
+        txHash: result.txHash,
+      });
+      contractErrors++;
       continue;
     }
 
-    // Sync each customer's updated state from chain and fire webhooks
+    log.info("renewal batch: contract call succeeded", {
+      batch:   batchIdx,
+      txHash:  result.txHash,
+      summary: result.summary,
+    });
+
     for (const row of batch) {
       const sub = await getSubscription(row.customerAddress);
-      if (!sub) continue;
+      if (!sub) {
+        log.warn("renewal batch: subscription not found after renewal", {
+          customer: row.customerAddress,
+        });
+        continue;
+      }
 
       const succeeded = sub.status === "Active";
 
-      // Update cache
       await db
         .update(subscriptionCache)
         .set({
           status:             sub.status,
           currentPeriodStart: fromUnixSeconds(sub.current_period_start),
           currentPeriodEnd:   fromUnixSeconds(sub.current_period_end),
-          usageCurrent:       sub.usage_current,
+          usageCurrent:       Number(sub.usage_current),
           syncedAt:           now(),
         })
         .where(eq(subscriptionCache.customerAddress, row.customerAddress));
 
-      // Bust entitlement cache
       await invalidateEntitlementCache(row.customerAddress);
 
-      // Fire webhook
+      const event = succeeded ? "payment.renewed" : "payment.failed";
+
+      log.info("renewal: subscription updated", {
+        customer:  row.customerAddress,
+        planId:    row.planId,
+        oldStatus: row.status,
+        newStatus: sub.status,
+        event,
+      });
+
       await fireWebhook({
         developerId: row.developerId,
-        event:       succeeded ? "payment.renewed" : "payment.failed",
+        event,
         payload: {
           customer:  row.customerAddress,
           planId:    row.planId.toString(),
@@ -89,47 +111,91 @@ export async function runRenewalCycle(): Promise<void> {
           periodEnd: sub.current_period_end.toString(),
         },
       });
+
+      succeeded ? renewed++ : failed++;
     }
   }
+
+  log.info("renewal cycle: complete", {
+    durationMs:     Date.now() - cycleStart,
+    total:          due.length,
+    renewed,
+    failed,
+    contractErrors,
+  });
 }
 
-// ─── Grace expiry ─────────────────────────────────────────────────────────────
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Grace expiry — called every 15min by the grace-expiry job
+// ─────────────────────────────────────────────────────────────────────────────
 export async function runGraceExpiry(): Promise<void> {
-  const customers = await getGracePeriodCustomers();
-  if (customers.length === 0) return;
+  const cycleStart = Date.now();
+  const customers  = await getGracePeriodCustomers();
 
-  for (let i = 0; i < customers.length; i += GRACE_BATCH_SIZE) {
-    const batch = customers.slice(i, i + GRACE_BATCH_SIZE);
+  if (customers.length === 0) {
+    log.debug("grace expiry: no customers in grace period");
+    return;
+  }
+
+  log.info("grace expiry: checking customers", { count: customers.length });
+
+  let expired        = 0;
+  let contractErrors = 0;
+
+  for (let i = 0; i < customers.length; i += GRACE_BATCH) {
+    const batch    = customers.slice(i, i + GRACE_BATCH);
+    const batchIdx = Math.floor(i / GRACE_BATCH) + 1;
+
+    log.info("grace expiry batch: submitting", {
+      batch:     batchIdx,
+      customers: batch.length,
+    });
 
     const result = await expireGracePeriods(batch);
 
     if (result.error) {
-      console.error("[billing] expireGracePeriods error:", result.error);
+      log.error("grace expiry batch: contract call failed", {
+        batch:  batchIdx,
+        error:  result.error,
+        txHash: result.txHash,
+      });
+      contractErrors++;
       continue;
     }
 
-    // For each expired customer: clear Redis, invalidate entitlement, fire webhook
+    log.info("grace expiry batch: contract call succeeded", {
+      batch:   batchIdx,
+      expired: result.expired,
+      txHash:  result.txHash,
+    });
+
     for (const customer of batch) {
       await clearGracePeriod(customer);
       await invalidateEntitlementCache(customer);
 
-      // Look up developerId from cache
       const cacheRow = await db
         .select()
         .from(subscriptionCache)
         .where(eq(subscriptionCache.customerAddress, customer))
         .limit(1);
 
-      if (cacheRow.length === 0) continue;
+      if (cacheRow.length === 0 || !cacheRow[0]) {
+        log.warn("grace expiry: no cache row found for customer", { customer });
+        continue;
+      }
+
       const row = cacheRow[0];
 
-      if (!row) continue;
-   
       await db
         .update(subscriptionCache)
         .set({ status: "Cancelled", syncedAt: now() })
         .where(eq(subscriptionCache.customerAddress, customer));
+
+      log.info("grace expiry: subscription cancelled", {
+        customer,
+        planId:    row.planId,
+        developerId: row.developerId,
+      });
 
       await fireWebhook({
         developerId: row.developerId,
@@ -140,6 +206,15 @@ export async function runGraceExpiry(): Promise<void> {
           reason: "grace_period_expired",
         },
       });
+
+      expired++;
     }
   }
+
+  log.info("grace expiry: complete", {
+    durationMs:     Date.now() - cycleStart,
+    total:          customers.length,
+    expired,
+    contractErrors,
+  });
 }
