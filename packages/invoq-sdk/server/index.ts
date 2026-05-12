@@ -110,6 +110,6 @@ export type {
   PaymentEventData,
   UsageThresholdData,
   VaultEventData,
-} from "../shared/types.js";
+} from "../shared/types";
 
 export default InvoqServer;

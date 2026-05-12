@@ -1,0 +1,51 @@
+{
+  "name": "invoq-sdk",
+  "version": "0.1.0",
+  "description": "Official JavaScript/TypeScript SDK for Invoq — subscription billing on Stellar",
+  "type": "module",
+  "author": "Invoq",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/invoq/invoq-sdk-js"
+  },
+  "keywords": [
+    "stellar",
+    "soroban",
+    "subscription",
+    "billing",
+    "usdc",
+    "payments",
+    "x402"
+  ],
+  "exports": {
+    "./server": {
+      "import": "./dist/server/index.js",
+      "types":  "./dist/server/index.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client/index.js",
+      "types":  "./dist/client/index.d.ts"
+    }
+  },
+  "main": "./dist/server/index.js",
+  "types": "./dist/server/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build":     "tsc -p tsconfig.json",
+    "dev":       "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean":     "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

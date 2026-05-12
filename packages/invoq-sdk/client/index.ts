@@ -5,8 +5,8 @@
 // to sensitive endpoints and cannot perform admin operations.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { HttpClient } from "../shared/http.js";
-import type { InvoqConfig } from "../shared/types.js";
+import { HttpClient } from "../shared/http";
+import type { InvoqConfig } from "../shared/types";
 import { InvoqError } from "../shared/error";
 import { CheckoutResource } from "./checkout";
 import { ClientEntitlementResource } from "./entitlement";
