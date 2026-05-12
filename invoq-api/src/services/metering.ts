@@ -70,7 +70,7 @@ export async function flushUsageBuffer(): Promise<{
         id:              newId(),
         customerAddress: e.customer,
         developerId:     "system",
-        units:           e.units,
+        units:           Number(e.units),
         flushedAt:       now(),
         txHash:          result.txHash ?? null,
         createdAt:       now(),
