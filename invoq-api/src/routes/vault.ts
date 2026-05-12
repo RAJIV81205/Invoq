@@ -81,6 +81,17 @@ router.post(
     });
 
     if (result.error) {
+      if (
+        result.txHash &&
+        result.error.includes("Transaction not confirmed after")
+      ) {
+        res.status(202).json({
+          txHash: result.txHash,
+          pending: true,
+          warning: result.error,
+        });
+        return;
+      }
       res.status(502).json({ error: result.error });
       return;
     }

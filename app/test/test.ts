@@ -27,6 +27,32 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
   let planId: string | null = null;
   let freePlanId: string | null = null;
   let webhookId: string | null = null;
+  let publishableKey: string | null = null;
+  let publishableKeyId: string | null = null;
+  let rotatedSecretKey: string | null = null;
+  let rotatedSecretKeyId: string | null = null;
+
+  async function callRaw(
+    method: string,
+    path: string,
+    opts?: { body?: unknown; headers?: Record<string, string> },
+  ): Promise<{ status: number; data: any }> {
+    const res = await fetch(`http://localhost:3001${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(opts?.headers ?? {}),
+      },
+      body: opts?.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    });
+    let data: any = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+    return { status: res.status, data };
+  }
 
   // ── Section 0: Health & Auth ──────────────────────────────────────────────
   const s0 = 0;
@@ -59,6 +85,104 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
     report(s0, r.status === 404
       ? pass("Valid key, unknown plan → 404", undefined, undefined, ms)
       : fail("Valid key, unknown plan → 404", `Got ${r.status}`));
+  }
+
+  {
+    const r = await callRaw("POST", "/v1/keys/publishable", {
+      body: { name: "e2e-publishable" },
+      headers: { Authorization: "Bearer sk_live_badkey" },
+    });
+    report(s0, r.status === 401
+      ? pass("Create key with invalid sk → 401")
+      : fail("Create key with invalid sk → 401", `Got ${r.status}`));
+  }
+
+  {
+    const { result: r, ms } = await timed(() =>
+      api("POST", "/v1/keys/publishable", { name: "e2e-publishable" })
+    );
+    publishableKey = r.data?.key ?? null;
+    publishableKeyId = r.data?.keyId ?? null;
+    report(s0, publishableKey && publishableKeyId
+      ? pass("Create publishable key", `id: ${publishableKeyId}`, undefined, ms)
+      : fail("Create publishable key", r.error ?? "No key returned"));
+  }
+
+  {
+    const { result: r, ms } = await timed(() =>
+      api("POST", "/v1/keys/secret", { name: "e2e-rotated-secret" })
+    );
+    rotatedSecretKey = r.data?.key ?? null;
+    rotatedSecretKeyId = r.data?.keyId ?? null;
+    report(s0, rotatedSecretKey && rotatedSecretKeyId
+      ? pass("Create secret key (rotation)", `id: ${rotatedSecretKeyId}`, undefined, ms)
+      : fail("Create secret key (rotation)", r.error ?? "No key returned"));
+  }
+
+  {
+    const r = await api("GET", "/v1/keys");
+    const ok = Array.isArray(r.data)
+      && r.data.some((k: any) => k.id === publishableKeyId && k.type === "pk")
+      && r.data.some((k: any) => k.id === rotatedSecretKeyId && k.type === "sk");
+    report(s0, ok
+      ? pass("List keys includes created pk/sk")
+      : fail("List keys includes created pk/sk", r.error ?? JSON.stringify(r.data)));
+  }
+
+  if (publishableKey) {
+    const r = await callRaw("GET", `/v1/entitlement?customer=${developerAddress}&feature=api_access`, {
+      headers: { "X-Invoq-Key": publishableKey },
+    });
+    report(s0, r.status === 200
+      ? pass("Publishable key via X-Invoq-Key works on entitlement")
+      : fail("Publishable key via X-Invoq-Key works on entitlement", `Got ${r.status}`));
+  } else {
+    report(s0, skip("Publishable key entitlement check", "publishable key not created"));
+  }
+
+  if (publishableKey) {
+    const r = await callRaw("GET", "/v1/entitlement/full?customer=GINVALID&feature=api_access", {
+      headers: { "X-Invoq-Key": publishableKey },
+    });
+    report(s0, r.status === 403
+      ? pass("Publishable key blocked on sk-only endpoint → 403")
+      : fail("Publishable key blocked on sk-only endpoint → 403", `Got ${r.status}`));
+  } else {
+    report(s0, skip("Publishable key sk-only rejection", "publishable key not created"));
+  }
+
+  if (publishableKey) {
+    const r = await callRaw("GET", "/v1/entitlement?customer=GINVALID&feature=api_access", {
+      headers: {
+        Authorization: "Bearer sk_live_badkey",
+        "X-Invoq-Key": publishableKey,
+      },
+    });
+    report(s0, r.status === 401
+      ? pass("Mismatched auth headers rejected → 401")
+      : fail("Mismatched auth headers rejected → 401", `Got ${r.status}`));
+  } else {
+    report(s0, skip("Mismatched header rejection", "publishable key not created"));
+  }
+
+  if (publishableKeyId) {
+    const r = await api("DELETE", `/v1/keys/${publishableKeyId}`);
+    report(s0, r.data?.revoked === true
+      ? pass("Revoke publishable key")
+      : fail("Revoke publishable key", r.error ?? JSON.stringify(r.data)));
+  } else {
+    report(s0, skip("Revoke publishable key", "publishable key id missing"));
+  }
+
+  if (publishableKey) {
+    const r = await callRaw("GET", `/v1/entitlement?customer=${developerAddress}&feature=api_access`, {
+      headers: { "X-Invoq-Key": publishableKey },
+    });
+    report(s0, r.status === 401
+      ? pass("Revoked publishable key fails auth → 401")
+      : fail("Revoked publishable key fails auth → 401", `Got ${r.status}`));
+  } else {
+    report(s0, skip("Revoked publishable key auth check", "publishable key missing"));
   }
 
   {
@@ -516,9 +640,13 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
         usageDescription: "Test debit for API usage",
       })
     );
-    report(s6, r.data?.txHash
-      ? pass("Debit vault 0.1 USDC", `remaining: ${r.data.remainingBalance}`, r.data.txHash, ms)
-      : fail("Debit vault", r.error ?? "No txHash"));
+    if (r.status === 202 && r.data?.pending === true && r.data?.txHash) {
+      report(s6, pass("Debit vault pending confirmation", r.data.warning ?? "Pending on-chain", r.data.txHash, ms));
+    } else {
+      report(s6, r.data?.txHash
+        ? pass("Debit vault 0.1 USDC", `remaining: ${r.data.remainingBalance}`, r.data.txHash, ms)
+        : fail("Debit vault", r.error ?? "No txHash"));
+    }
   } else {
     report(s6, skip("Debit vault", "no vault"));
   }
@@ -671,5 +799,14 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
     report(s7, !stillThere
       ? pass("Deleted endpoint gone from list")
       : fail("Deleted endpoint still in list"));
+  }
+
+  if (rotatedSecretKeyId) {
+    const r = await api("DELETE", `/v1/keys/${rotatedSecretKeyId}`);
+    report(s7, r.data?.revoked === true
+      ? pass("Cleanup: revoke rotated secret key")
+      : fail("Cleanup: revoke rotated secret key", r.error ?? JSON.stringify(r.data)));
+  } else {
+    report(s7, skip("Cleanup: revoke rotated secret key", "no rotated secret key created"));
   }
 }
