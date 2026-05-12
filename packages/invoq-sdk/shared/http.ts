@@ -49,17 +49,16 @@ export class HttpClient {
     const method = opts.method ?? "GET";
     const url    = this.buildUrl(opts.path, opts.query);
 
-    const authHeader =
-      this.apiKey.startsWith("pk_")
-        ? { "X-Invoq-Key": this.apiKey }
-        : { "Authorization": `Bearer ${this.apiKey}` };
-
     const headers: Record<string, string> = {
-      ...authHeader,
       "Content-Type":  "application/json",
       "Accept":        "application/json",
       "User-Agent":    "invoq-sdk/1.0.0",
     };
+    if (this.apiKey.startsWith("pk_")) {
+      headers["X-Invoq-Key"] = this.apiKey;
+    } else {
+      headers["Authorization"] = `Bearer ${this.apiKey}`;
+    }
 
     const controller = new AbortController();
     const timer      = setTimeout(() => controller.abort(), this.timeoutMs);
