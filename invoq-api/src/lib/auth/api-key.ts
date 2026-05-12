@@ -23,6 +23,7 @@ import type { Request } from "express";
 
 export type KeyType = "sk" | "pk";
 export type KeyEnv  = "live" | "test";
+const API_KEY_REGEX = /^(sk|pk)_(live|test)_([a-f0-9]{64})$/;
 
 export interface AuthResult {
   valid: boolean;
@@ -30,6 +31,7 @@ export interface AuthResult {
   developerAddress: string | null;
   keyId: string | null;
   keyType: KeyType | null;
+  keyEnv: KeyEnv | null;
   error: string | null;
 }
 
@@ -39,6 +41,7 @@ const INVALID: AuthResult = {
   developerAddress: null,
   keyId: null,
   keyType: null,
+  keyEnv: null,
   error: null,
 };
 
@@ -60,9 +63,15 @@ export function hashApiKey(plaintext: string): string {
 }
 
 export function getKeyType(key: string): KeyType | null {
-  if (key.startsWith("sk_")) return "sk";
-  if (key.startsWith("pk_")) return "pk";
-  return null;
+  const match = key.match(API_KEY_REGEX);
+  if (!match) return null;
+  return match[1] as KeyType;
+}
+
+export function getKeyEnv(key: string): KeyEnv | null {
+  const match = key.match(API_KEY_REGEX);
+  if (!match) return null;
+  return match[2] as KeyEnv;
 }
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
@@ -70,10 +79,11 @@ export function getKeyType(key: string): KeyType | null {
 export async function createApiKey(params: {
   developerId: string;
   type: KeyType;
+  env?: KeyEnv;
   name?: string;
   expiresAt?: Date;
 }): Promise<{ plaintext: string; keyId: string }> {
-  const { plaintext, hash, prefix } = generateApiKey(params.type);
+  const { plaintext, hash, prefix } = generateApiKey(params.type, params.env ?? "live");
   const keyId = newId();
 
   await db.insert(apiKeys).values({
@@ -102,6 +112,8 @@ export async function revokeApiKey(keyId: string, developerId: string): Promise<
 export async function validateApiKey(plaintext: string): Promise<AuthResult> {
   const keyType = getKeyType(plaintext);
   if (!keyType) return { ...INVALID, error: "Invalid key format" };
+  const keyEnv = getKeyEnv(plaintext);
+  if (!keyEnv) return { ...INVALID, error: "Invalid key format" };
 
   const hash = hashApiKey(plaintext);
 
@@ -139,6 +151,7 @@ export async function validateApiKey(plaintext: string): Promise<AuthResult> {
     developerAddress: row.stellarAddress,
     keyId:            row.keyId,
     keyType,
+    keyEnv,
     error:            null,
   };
 }
@@ -151,11 +164,18 @@ export async function validateApiKey(plaintext: string): Promise<AuthResult> {
  * X-Invoq-Key: pk_live_...            → publishable key
  */
 export function extractApiKey(req: Request): string | null {
-  const auth = req.headers["authorization"];
-  if (auth?.startsWith("Bearer ")) return auth.slice(7).trim();
-
+  const authHeader = req.headers["authorization"];
+  const auth = typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
   const invoqKey = req.headers["x-invoq-key"];
-  if (typeof invoqKey === "string") return invoqKey.trim();
+  const headerKey = typeof invoqKey === "string" ? invoqKey.trim() : null;
+
+  // Reject ambiguous/mismatched auth sources.
+  if (auth && headerKey && auth !== headerKey) return null;
+
+  if (headerKey) return headerKey;
+  if (auth) return auth;
 
   return null;
 }
@@ -168,6 +188,17 @@ export async function requireAuth(
   req: Request,
   allowedKeyTypes: KeyType[] = ["sk"]
 ): Promise<AuthResult> {
+  const authHeader = req.headers["authorization"];
+  const bearer = typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
+  const xHeader = typeof req.headers["x-invoq-key"] === "string"
+    ? req.headers["x-invoq-key"].trim()
+    : null;
+  if (bearer && xHeader && bearer !== xHeader) {
+    return { ...INVALID, error: "Authorization and X-Invoq-Key headers do not match" };
+  }
+
   const key = extractApiKey(req);
   if (!key) return { ...INVALID, error: "Missing API key" };
 

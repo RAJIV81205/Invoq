@@ -18,14 +18,19 @@ export function authenticate(allowedKeyTypes: KeyType[] = ["sk"]) {
     const result = await requireAuth(req, allowedKeyTypes);
 
     if (!result.valid) {
+      const status =
+        typeof result.error === "string" && result.error.startsWith("This endpoint requires a ")
+          ? 403
+          : 401;
       log.warn("auth rejected", {
         error:       result.error,
+        status,
         keyTypes:    allowedKeyTypes,
         method:      req.method,
         path:        req.path,
         ip:          req.ip ?? req.socket?.remoteAddress,
       });
-      res.status(401).json({ error: result.error ?? "Unauthorized" });
+      res.status(status).json({ error: result.error ?? "Unauthorized" });
       return;
     }
 

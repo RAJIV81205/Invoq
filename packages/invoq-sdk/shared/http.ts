@@ -49,8 +49,13 @@ export class HttpClient {
     const method = opts.method ?? "GET";
     const url    = this.buildUrl(opts.path, opts.query);
 
+    const authHeader =
+      this.apiKey.startsWith("pk_")
+        ? { "X-Invoq-Key": this.apiKey }
+        : { "Authorization": `Bearer ${this.apiKey}` };
+
     const headers: Record<string, string> = {
-      "Authorization": `Bearer ${this.apiKey}`,
+      ...authHeader,
       "Content-Type":  "application/json",
       "Accept":        "application/json",
       "User-Agent":    "invoq-sdk/1.0.0",

@@ -292,3 +292,43 @@ export interface InvoqConfig {
   /** Log all requests/responses to console. Default: false */
   debug?: boolean;
 }
+
+// ── API keys (server-side management) ───────────────────────────────────────
+
+export type ApiKeyType = "sk" | "pk";
+export type ApiKeyEnv = "live" | "test";
+
+export interface ApiKeyInfo {
+  id: string;
+  name: string | null;
+  keyPrefix: string;
+  type: ApiKeyType;
+  env: ApiKeyEnv;
+  revoked: boolean;
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+}
+
+export interface CreatePublishableKeyParams {
+  name?: string;
+  expiresAt?: string | Date;
+}
+
+export interface CreatePublishableKeyResult {
+  keyId: string;
+  key: string;
+  type: "pk";
+  env: ApiKeyEnv;
+  name: string | null;
+  expiresAt: string | null;
+}
+
+export interface CreateSecretKeyResult {
+  keyId: string;
+  key: string;
+  type: "sk";
+  env: ApiKeyEnv;
+  name: string | null;
+  expiresAt: string | null;
+}

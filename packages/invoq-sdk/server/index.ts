@@ -13,6 +13,7 @@ import { EntitlementResource } from "./entitlement";
 import { UsageResource } from "./usage";
 import { VaultResource } from "./vault";
 import { WebhooksResource } from "./webhooks";
+import { KeysResource } from "./keys";
 
 export class InvoqServer {
   private readonly http: HttpClient;
@@ -37,6 +38,9 @@ export class InvoqServer {
 
   /** Manage webhook endpoints and verify incoming payloads */
   readonly webhooks: WebhooksResource;
+
+  /** Manage API keys (list/create publishable/revoke) */
+  readonly keys: KeysResource;
 
   constructor(config: InvoqConfig) {
     // Guard: prevent accidental use of publishable key on server
@@ -63,6 +67,7 @@ export class InvoqServer {
     this.usage         = new UsageResource(this.http);
     this.vault         = new VaultResource(this.http);
     this.webhooks      = new WebhooksResource(this.http);
+    this.keys          = new KeysResource(this.http);
   }
 }
 
@@ -110,6 +115,12 @@ export type {
   PaymentEventData,
   UsageThresholdData,
   VaultEventData,
+  ApiKeyType,
+  ApiKeyEnv,
+  ApiKeyInfo,
+  CreatePublishableKeyParams,
+  CreatePublishableKeyResult,
+  CreateSecretKeyResult,
 } from "../shared/types";
 
 export default InvoqServer;
