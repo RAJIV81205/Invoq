@@ -175,6 +175,31 @@ export async function getPlanCount(): Promise<bigint> {
 
 // ─── Subscription management ──────────────────────────────────────────────────
 
+export async function setStatus(params: {
+  caller: string;
+  customer: string;
+  status: SubStatus;
+}): Promise<{ txHash: string | null; error: string | null }> {
+  const statusScVal =
+    params.status === "Trialing"    ? xdr.ScVal.scvSymbol("Trialing")
+  : params.status === "Active"      ? xdr.ScVal.scvSymbol("Active")
+  : params.status === "Paused"      ? xdr.ScVal.scvSymbol("Paused")
+  : params.status === "GracePeriod" ? xdr.ScVal.scvSymbol("GracePeriod")
+  : params.status === "Cancelled"   ? xdr.ScVal.scvSymbol("Cancelled")
+  :                                  xdr.ScVal.scvSymbol("Expired");
+
+  const result = await invokeContract({
+    contractId: CONTRACT_ID,
+    method: "update_status",
+    args: [
+      toScAddress(params.caller),
+      toScAddress(params.customer),
+      statusScVal,
+    ],
+  });
+  return { txHash: result.txHash, error: result.error };
+}
+
 export async function cancelSubscription(params: {
   caller: string;
   customer: string;

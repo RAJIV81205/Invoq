@@ -539,6 +539,125 @@ OUT=$(api DELETE "/v1/webhooks/$WEBHOOK_ENDPOINT_ID2")
 assert_contains "second endpoint deleted" "$OUT" '"deleted":true'
 
 ########################################
+# 10 — DEVELOPER SIGNUP / LOGIN
+########################################
+
+section "10 — Developer signup & login"
+
+step "10.1" "POST /v1/developers/signup — new developer (random email)"
+TEST_EMAIL="e2e-$(date +%s)@invoq-test.dev"
+TEST_NAME="E2E Test $(date +%s)"
+OUT=$(curl -s -X POST "$BASE_URL/v1/developers/signup" \
+  -H "Content-Type: application/json" \
+  -d "{\"stellarAddress\":\"$CUSTOMER_ADDRESS\",\"email\":\"$TEST_EMAIL\",\"name\":\"$TEST_NAME\"}")
+assert_json_field "signup returns developerId" "$OUT" "developerId"
+assert_json_field "signup returns secretKey"   "$OUT" "secretKey"
+assert_json_field "signup returns stellarAddress" "$OUT" "stellarAddress"
+
+step "10.2" "POST /v1/developers/login with same email — re-issue key"
+OUT=$(curl -s -X POST "$BASE_URL/v1/developers/login" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$TEST_EMAIL\",\"confirm\":true}")
+assert_json_field "login returns secretKey" "$OUT" "secretKey"
+
+step "10.3" "POST /v1/developers/login without confirm → 400"
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/v1/developers/login" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$TEST_EMAIL\"}")
+assert_status "login without confirm → 400" "$STATUS" "400"
+
+step "10.4" "POST /v1/developers/login with bad email → 404"
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/v1/developers/login" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"nope@example.com\",\"confirm\":true}")
+assert_status "bad email → 404" "$STATUS" "404"
+
+step "10.5" "POST /v1/developers/signup — missing fields → 400"
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/v1/developers/signup" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"x@y.com\"}")
+assert_status "missing fields → 400" "$STATUS" "400"
+
+########################################
+# 11 — SPEND POLICIES
+########################################
+
+section "11 — Spend policies"
+
+step "11.1" "POST /v1/spend-policies — create policy"
+OUT=$(api POST /v1/spend-policies '{
+  "owner":          "'$CUSTOMER_ADDRESS'",
+  "dailyLimitUsdc": 100000000,
+  "txLimitUsdc":    5000000,
+  "allowlist":      [],
+  "agents":         []
+}')
+assert_contains "policy create submitted" "$OUT" "txHash"
+
+step "11.2" "GET /v1/spend-policies/:owner — read policy"
+OUT=$(api GET "/v1/spend-policies/$CUSTOMER_ADDRESS")
+assert_contains "policy owner matches" "$OUT" "$CUSTOMER_ADDRESS"
+assert_contains "policy has daily_limit_usdc" "$OUT" "daily_limit_usdc"
+
+step "11.3" "POST /v1/spend-policies/check — simulate check"
+OUT=$(api POST /v1/spend-policies/check '{
+  "agent":       "'$CUSTOMER_ADDRESS'",
+  "destination": "GDESTINATIONXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "amountUsdc":  1000000
+}')
+assert_json_field "check returns allowed" "$OUT" "allowed"
+assert_json_field "check returns reason"  "$OUT" "reason"
+
+step "11.4" "POST /v1/spend-policies/check — missing fields → 400"
+STATUS=$(api_status POST /v1/spend-policies/check '{"agent":"x"}')
+assert_status "check missing fields → 400" "$STATUS" "400"
+
+step "11.5" "POST /v1/spend-policies/:owner/deactivate"
+OUT=$(api POST "/v1/spend-policies/$CUSTOMER_ADDRESS/deactivate")
+assert_contains "deactivate submitted" "$OUT" "txHash"
+
+step "11.6" "POST /v1/spend-policies/:owner/reactivate"
+OUT=$(api POST "/v1/spend-policies/$CUSTOMER_ADDRESS/reactivate")
+assert_contains "reactivate submitted" "$OUT" "txHash"
+
+step "11.7" "GET /v1/spend-policies/:owner/daily — read daily state"
+OUT=$(api GET "/v1/spend-policies/$CUSTOMER_ADDRESS/daily")
+assert_json_field "daily returns spent" "$OUT" "spent"
+assert_json_field "daily returns remaining" "$OUT" "remaining"
+
+########################################
+# 12 — PLAN + SUBSCRIPTION LIST
+########################################
+
+section "12 — List & lifecycle endpoints"
+
+step "12.1" "GET /v1/plans — list developer's plans"
+OUT=$(api GET /v1/plans)
+assert_json_field "plans list returns plans array" "$OUT" "plans"
+
+step "12.2" "GET /v1/subscriptions — list subscribers"
+OUT=$(api GET /v1/subscriptions)
+assert_json_field "subs list returns subscriptions" "$OUT" "subscriptions"
+assert_json_field "subs list returns count" "$OUT" "count"
+
+step "12.3" "GET /v1/vault/balances — list vaults"
+OUT=$(api GET /v1/vault/balances)
+assert_json_field "balances returns vaults" "$OUT" "vaults"
+assert_json_field "balances returns count" "$OUT" "count"
+
+########################################
+# 13 — SUBSCRIPTION HISTORY
+########################################
+
+section "13 — Subscription history"
+
+step "13.1" "GET /v1/subscriptions/:customer/history"
+OUT=$(api GET "/v1/subscriptions/$CUSTOMER_ADDRESS/history")
+# It returns either a subscription or null; either way has the fields
+assert_json_field "history has events array" "$OUT" "events"
+assert_json_field "history has transactions array" "$OUT" "transactions"
+
+########################################
 # SUMMARY
 ########################################
 

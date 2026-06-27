@@ -1,70 +1,64 @@
 /**
  * src/lib/cache/redis.ts
  *
- * Upstash Redis client + caching helpers for Invoq.
+ * Local Redis client + caching helpers for Invoq.
  */
 
-import { Redis } from "@upstash/redis";
+import RedisModule from "ioredis";
+import type { Redis as RedisClient, RedisOptions } from "ioredis";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Singleton client
 // ─────────────────────────────────────────────────────────────────────────────
 
 declare global {
-  var __redis: Redis | undefined;
+  var __redis: RedisClient | undefined;
 }
 
-function getRedis(): Redis {
-  if (!globalThis.__redis) {
-    const url = process.env.UPSTASH_REDIS_REST_URL;
-    const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+const Redis = RedisModule as unknown as new (options?: RedisOptions) => RedisClient;
 
-    if (!url) {
-      throw new Error("Missing env var: UPSTASH_REDIS_REST_URL");
-    }
-
-    if (!token) {
-      throw new Error("Missing env var: UPSTASH_REDIS_REST_TOKEN");
-    }
-
-    globalThis.__redis = new Redis({
-      url,
-      token,
-    });
+function buildRedisConfig(): RedisOptions {
+  const redisUrl = process.env.REDIS_URL;
+  if (redisUrl) {
+    const urlObj = new URL(redisUrl);
+    return {
+      host: urlObj.hostname,
+      port: Number.parseInt(urlObj.port || "6379", 10),
+      username: urlObj.username || undefined,
+      password: urlObj.password || undefined,
+      db: urlObj.pathname && urlObj.pathname !== "/" ? Number.parseInt(urlObj.pathname.slice(1), 10) : undefined,
+      tls: urlObj.protocol === "rediss:" ? {} : undefined,
+    };
   }
 
-  return globalThis.__redis;
+  return {
+    host: process.env.REDIS_HOST ?? "127.0.0.1",
+    port: Number.parseInt(process.env.REDIS_PORT ?? "6379", 10),
+    username: process.env.REDIS_USERNAME || undefined,
+    password: process.env.REDIS_PASSWORD || undefined,
+    db: process.env.REDIS_DB ? Number.parseInt(process.env.REDIS_DB, 10) : undefined,
+    tls: process.env.REDIS_TLS === "true" ? {} : undefined,
+  };
 }
 
-export function redis(): Redis {
+function getRedis(): RedisClient {
+  if (!globalThis.__redis) {
+    globalThis.__redis = new Redis(buildRedisConfig());
+  }
+
+  return globalThis.__redis!;
+}
+
+export function redis(): RedisClient {
   return getRedis();
 }
 
 /**
  * Get Redis connection config for BullMQ.
- * BullMQ expects ioredis-compatible connection options, not Upstash Redis client.
- * 
- * Note: Upstash provides two types of connections:
- * 1. REST API (HTTPS) - used by @upstash/redis client
- * 2. Native Redis protocol (rediss://) - required for BullMQ/ioredis
+ * BullMQ expects ioredis-compatible connection options.
  */
 export function getRedisConnectionConfig() {
-  const redisUrl = process.env.UPSTASH_REDIS_URL;
-
-  if (!redisUrl) {
-    throw new Error("Missing UPSTASH_REDIS_URL environment variable. Get the native Redis URL from Upstash dashboard.");
-  }
-
-  // Parse the native Redis URL (rediss://default:password@host:port)
-  const urlObj = new URL(redisUrl);
-  
-  return {
-    host: urlObj.hostname,
-    port: parseInt(urlObj.port || '6379'),
-    password: urlObj.password,
-    username: urlObj.username || 'default',
-    tls: urlObj.protocol === 'rediss:' ? {} : undefined,
-  };
+  return buildRedisConfig();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -87,6 +81,12 @@ const keys = {
 
   gracePeriod: (customer: string) =>
     `grace:${customer}`,
+
+  usageThreshold: (customer: string, periodEnd: string) =>
+    `usage_thresh:${customer}:${periodEnd}`,
+
+  trialWarned: (customer: string) =>
+    `trial_warned:${customer}`,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ export async function getCachedEntitlement(
   customer: string,
   feature: string
 ): Promise<boolean | null> {
-  const val = await redis().get<string>(
+  const val = await redis().get(
     keys.entitlement(customer, feature)
   );
 
@@ -114,16 +114,13 @@ export async function setCachedEntitlement(
   await redis().set(
     keys.entitlement(customer, feature),
     entitled ? "1" : "0",
-    {
-      ex: ENTITLEMENT_TTL_SECONDS,
-    }
+    "EX",
+    ENTITLEMENT_TTL_SECONDS,
   );
 }
 
 /**
  * Invalidate entitlement cache for a customer.
- *
- * Upstash supports scan().
  */
 export async function invalidateEntitlementCache(
   customer: string
@@ -135,10 +132,10 @@ export async function invalidateEntitlementCache(
   do {
     const [nextCursor, foundKeys] = await redis().scan(
       cursor,
-      {
-        match: pattern,
-        count: 100,
-      }
+      "MATCH",
+      pattern,
+      "COUNT",
+      100,
     );
 
     cursor = Number(nextCursor);
@@ -171,16 +168,13 @@ export async function bufferUsage(
 
 /**
  * Read and clear usage buffer.
- *
- * Upstash doesn't support EVAL in all plans reliably,
- * so use MULTI transaction instead.
  */
 export async function drainUsageBuffer(
   customer: string
 ): Promise<number> {
   const key = keys.usageBuffer(customer);
 
-  const current = await redis().get<string>(key);
+  const current = await redis().get(key);
 
   if (!current) {
     return 0;
@@ -205,10 +199,10 @@ export async function getPendingUsageCustomers(): Promise<string[]> {
   do {
     const [nextCursor, foundKeys] = await redis().scan(
       cursor,
-      {
-        match: "usage_buf:*",
-        count: 200,
-      }
+      "MATCH",
+      "usage_buf:*",
+      "COUNT",
+      200,
     );
 
     cursor = Number(nextCursor);
@@ -242,9 +236,8 @@ export async function markGracePeriod(
   await redis().set(
     keys.gracePeriod(customer),
     graceExpiresAt.toString(),
-    {
-      ex: ttl,
-    }
+    "EX",
+    ttl,
   );
 }
 
@@ -264,10 +257,10 @@ export async function getGracePeriodCustomers(): Promise<string[]> {
   do {
     const [nextCursor, foundKeys] = await redis().scan(
       cursor,
-      {
-        match: "grace:*",
-        count: 200,
-      }
+      "MATCH",
+      "grace:*",
+      "COUNT",
+      200,
     );
 
     cursor = Number(nextCursor);
@@ -287,11 +280,62 @@ export async function getGracePeriodCustomers(): Promise<string[]> {
 // Health check
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─── Usage threshold tracking ────────────────────────────────────────────────
+//
+// Stores the highest threshold band (50 / 80 / 95) already emitted for a
+// customer in a given billing period. Prevents duplicate webhooks.
+export async function getUsageThreshold(
+  customer: string,
+  periodEnd: string,
+): Promise<number | null> {
+  const v = await redis().get(keys.usageThreshold(customer, periodEnd));
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+export async function setUsageThreshold(
+  customer: string,
+  periodEnd: string,
+  thresholdPct: number,
+): Promise<void> {
+  // TTL slightly longer than the period so the entry expires after renewal.
+  // Cap to 32 days (~billing period safety).
+  await redis().set(
+    keys.usageThreshold(customer, periodEnd),
+    String(thresholdPct),
+    "EX",
+    60 * 60 * 24 * 32,
+  );
+}
+
+// ─── Trial-ending dedupe ─────────────────────────────────────────────────────
+//
+// Once a customer's trial.ending webhook has fired, we don't fire it again
+// until the next trial_end timestamp.
+export async function getTrialWarned(customer: string): Promise<string | null> {
+  const v = await redis().get(keys.trialWarned(customer));
+  return v ?? null;
+}
+
+export async function setTrialWarned(
+  customer: string,
+  trialEndUnix: string,
+): Promise<void> {
+  // TTL = 40 days — safe for a 30-day trial plus renewal cycle.
+  await redis().set(
+    keys.trialWarned(customer),
+    trialEndUnix,
+    "EX",
+    60 * 60 * 24 * 40,
+  );
+}
+
 export async function pingRedis(): Promise<boolean> {
   try {
     const result = await redis().ping();
 
-    return result === "PONG";
+    return typeof result === "string" && result.toUpperCase() === "PONG";
   } catch {
     return false;
   }

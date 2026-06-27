@@ -465,6 +465,107 @@ Invoq is designed for:
 
 ---
 
+# Getting Started
+
+## 1. Deploy the contracts
+
+```bash
+# Build all four Soroban contracts
+npm run compile
+
+# Deploy to testnet (Registry + BillingCycle, then wires them together)
+npm run deploy
+
+# Optional: deploy SpendPolicy and EscrowVault
+npm run deploy:spend-policy
+npm run deploy:escrow-vault
+```
+
+The deploy script prints the contract addresses. Paste them into `invoq-api/.env` and `lib/config.ts` (see the "Contract addresses" section below).
+
+## 2. Start the API
+
+```bash
+cd invoq-api
+cp .env.example .env       # fill in DATABASE_URL, Redis config, admin key
+bun install
+bun run db:push            # apply the schema (adds new payout_address column on first push)
+bun run dev                # http://localhost:3001
+```
+
+In another terminal, smoke-test it:
+
+```bash
+API_KEY=sk_live_... CUSTOMER_ADDRESS=G... bash scripts/test-api.sh
+```
+
+## 3. Open the dashboard
+
+```bash
+cd ..                       # back to the repo root
+bun install
+cp .env.example .env        # fill in NEXT_PUBLIC_INVOQ_API_URL
+bun run dev                 # http://localhost:3000
+```
+
+Visit:
+
+- `http://localhost:3000`         — landing page
+- `http://localhost:3000/signup`  — create a developer + receive your first secret API key
+- `http://localhost:3000/login`   — sign in with the email you used
+- `http://localhost:3000/dashboard` — overview, plans, customers, webhooks, usage, vault, API keys, settings
+- `http://localhost:3000/test`    — end-to-end test suite (Freighter wallet required)
+
+## 4. Use the SDK
+
+```bash
+npm install invoq-sdk
+```
+
+```typescript
+import { InvoqServer } from "invoq-sdk/server";
+const invoq = new InvoqServer({ apiKey: process.env.INVOQ_KEY! });
+const { entitled } = await invoq.entitlement.check(customer, "api:pro");
+```
+
+The dashboard goes through a BFF (`app/api/[...path]/route.ts`) that injects the session's API key. Secret keys are never exposed to the browser.
+
+## 5. Contract addresses
+
+The repo ships with testnet addresses in `invoq-api/src/config.ts` and `lib/config.ts`. For your own deployment, replace the constants with the addresses your `npm run deploy` printed.
+
+| Contract            | Testnet address |
+| ------------------- | --------------- |
+| SubscriptionRegistry | `CCYREON6K2AGO5DRQMTW4MVNYBBOLOPZMP4RP7JY6H3FXUFQFH2SXQYA` |
+| BillingCycle         | `CCCFUSKCBHLVDWHLO7WYZ5EEC3QRYZLUQ5HWCPAGB7J5WKS3B2NOMKHO` |
+| SpendPolicy          | `CDTLW43XT55X5FZB3PPC5Y7UG6PSYC4LW3ZED23YIEIVDXVOT72QHFPG` |
+| EscrowVault          | `CBANJOGMJZ3CAIHX45UWUTDUVXZIMUYOZPXNHYZLKKHZBQ5ZAR6L2LLO` |
+| USDC SAC             | `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA` |
+
+---
+
+# API endpoints
+
+The full REST surface is documented in `Invoq_Contract_Specification.md` and exercised by `scripts/test-api.sh`. Highlights:
+
+- `POST /v1/developers/signup` & `POST /v1/developers/login` — self-custodied onboarding
+- `GET  /v1/developers/me` & `PATCH /v1/developers/me` — developer profile
+- `POST /v1/plans` (admin-signed) & `POST /v1/plans/build-tx` (developer-signed) — plan lifecycle
+- `POST /v1/checkout/{build,submit}-tx` — subscription signup flow
+- `GET  /v1/entitlement?customer=…&feature=…` — Redis-cached entitlement check
+- `POST /v1/usage/record` — buffered usage metering
+- `GET  /v1/subscriptions` & `GET /v1/subscriptions/:customer/history` — subscription state
+- `POST /v1/subscriptions/:customer/pause` & `/resume` — lifecycle control
+- `GET  /v1/vault/balances` — all vaults for the developer
+- `POST /v1/vault/{build,submit}-deposit-tx` — customer deposits USDC
+- `POST /v1/spend-policies` & `GET /v1/spend-policies/:owner` — enterprise budget policies
+- `POST /v1/spend-policies/check` — public read-only gate
+- `POST /v1/keys/{secret,publishable}` & `DELETE /v1/keys/:id` — API key management
+
+Webhooks fired by the platform: `subscription.created`, `subscription.cancelled`, `payment.renewed`, `payment.failed`, `payment.retry_succeeded`, `usage.threshold`, `trial.ending`, `vault.created`, `vault.low_balance`.
+
+---
+
 # Development Roadmap
 
 ## Milestone 1

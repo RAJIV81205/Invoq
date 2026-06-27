@@ -20,11 +20,18 @@ import {
 } from "../lib/stellar/escrow-vault.js";
 import {
   buildWithdrawVaultTxXdr,
+  buildDepositVaultTxXdr,
   buildUpdateVaultThresholdTxXdr,
   wrapAndSubmit,
   verifyInnerTxSigner,
 } from "../lib/stellar/feeBump.js";
 import { getNetworkPassphrase } from "../lib/stellar/client.js";
+import { db, subscriptionCache } from "../lib/db/index.js";
+import { eq } from "drizzle-orm";
+import { createLogger } from "../lib/logger.js";
+import { fireWebhook } from "../services/webhook.js";
+
+const log = createLogger("vault");
 
 const router = Router();
 
@@ -94,6 +101,28 @@ router.post(
       }
       res.status(502).json({ error: result.error });
       return;
+    }
+
+    // Fire vault.low_balance webhook if the new balance is at or below threshold.
+    // Best-effort: read the vault for threshold; do not block the debit on it.
+    if (res.locals.auth.developerId && result.remainingBalance !== null) {
+      try {
+        const v = await getVault(customer, developer);
+        if (v && v.low_balance_threshold > 0n && result.remainingBalance <= v.low_balance_threshold) {
+          await fireWebhook({
+            developerId: res.locals.auth.developerId,
+            event:       "vault.low_balance",
+            payload: {
+              customer:  customer,
+              developer: developer,
+              balance:   result.remainingBalance.toString(),
+              threshold: v.low_balance_threshold.toString(),
+            },
+          });
+        }
+      } catch (err) {
+        console.error("[vault] low_balance webhook failed:", err);
+      }
     }
 
     res.json({
@@ -289,6 +318,118 @@ router.post(
 // body: { signedXdr, customerAddress }
 router.post(
   "/submit-threshold-tx",
+  authenticate(["sk", "pk"]),
+  asyncHandler(async (req, res) => {
+    const { signedXdr, customerAddress } = req.body;
+
+    if (!signedXdr || !customerAddress) {
+      res.status(400).json({ error: "signedXdr, customerAddress required" });
+      return;
+    }
+
+    const passphrase = getNetworkPassphrase();
+    const signerValid = verifyInnerTxSigner(signedXdr, customerAddress, passphrase);
+    if (!signerValid) {
+      res.status(400).json({ error: "Transaction signature does not match customerAddress" });
+      return;
+    }
+
+    const result = await wrapAndSubmit(signedXdr);
+
+    if (result.error) {
+      res.status(502).json({ error: result.error });
+      return;
+    }
+
+    res.json({ txHash: result.txHash });
+  })
+);
+
+// GET /v1/vault/balances
+// Returns all vaults known to this developer. For each unique customer in
+// subscriptionCache we attempt to read the on-chain vault (capped at 20
+// concurrent to avoid RPC storms). Customers without a vault are skipped.
+router.get(
+  "/balances",
+  authenticate(),
+  asyncHandler(async (req, res) => {
+    const { developerAddress } = res.locals.auth;
+    if (!developerAddress) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const customers = await db
+      .select({ customerAddress: subscriptionCache.customerAddress })
+      .from(subscriptionCache)
+      .where(eq(subscriptionCache.developerAddress, developerAddress));
+
+    const unique = Array.from(new Set(customers.map((c) => c.customerAddress)));
+
+    const out: any[] = [];
+    const CONCURRENCY = 20;
+    for (let i = 0; i < unique.length; i += CONCURRENCY) {
+      const slice = unique.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(
+        slice.map(async (cust) => {
+          try {
+            const v = await getVault(cust, developerAddress);
+            return v
+              ? {
+                  customer:            cust,
+                  developer:           developerAddress,
+                  balance_usdc:        v.balance_usdc.toString(),
+                  total_deposited:     v.total_deposited.toString(),
+                  total_debited:       v.total_debited.toString(),
+                  low_balance_threshold: v.low_balance_threshold.toString(),
+                  auto_topup_amount:   v.auto_topup_amount.toString(),
+                  created_at:          v.created_at.toString(),
+                }
+              : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+      for (const r of results) if (r) out.push(r);
+    }
+
+    res.json({ count: out.length, vaults: out });
+  })
+);
+
+
+// body: { customerAddress, developerAddress, amount }
+router.post(
+  "/build-deposit-tx",
+  authenticate(["sk", "pk"]),
+  asyncHandler(async (req, res) => {
+    const { customerAddress, developerAddress, amount } = req.body;
+
+    if (!customerAddress || !developerAddress || amount === undefined) {
+      res.status(400).json({ error: "customerAddress, developerAddress, amount required" });
+      return;
+    }
+
+    const result = await buildDepositVaultTxXdr({
+      customerAddress,
+      developerAddress,
+      amount: BigInt(amount),
+    });
+
+    if (result.error) {
+      res.status(502).json({ error: result.error });
+      return;
+    }
+
+    res.json({ xdr: result.xdr });
+  })
+);
+
+// POST /v1/vault/submit-deposit-tx
+// body: { signedXdr, customerAddress }
+router.post(
+  "/submit-deposit-tx",
   authenticate(["sk", "pk"]),
   asyncHandler(async (req, res) => {
     const { signedXdr, customerAddress } = req.body;

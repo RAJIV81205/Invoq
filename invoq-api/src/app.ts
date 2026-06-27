@@ -15,6 +15,8 @@ import checkoutRouter      from "./routes/checkout.js";
 import vaultRouter         from "./routes/vault.js";
 import webhooksRouter      from "./routes/webhooks.js";
 import keysRouter          from "./routes/keys.js";
+import developersRouter    from "./routes/developers.js";
+import spendPoliciesRouter from "./routes/spend-policies.js";
 
 const log = createLogger("app");
 
@@ -109,6 +111,8 @@ export function createApp() {
   app.use("/v1/vault",         vaultRouter);
   app.use("/v1/webhooks",      webhooksRouter);
   app.use("/v1/keys",          keysRouter);
+  app.use("/v1/developers",     developersRouter);
+  app.use("/v1/spend-policies",  spendPoliciesRouter);
 
   // ── 404 ────────────────────────────────────────────────────────────────────
   app.use((req, res) => {

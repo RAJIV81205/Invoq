@@ -30,6 +30,7 @@ import { db, subscriptionCache, newId, now } from "../lib/db/index.js";
 import { invalidateEntitlementCache } from "../lib/cache/redis.js";
 import { getSubscription } from "../lib/stellar/registry.js";
 import { fromUnixSeconds } from "../lib/db/index.js";
+import { fireWebhook } from "../services/webhook.js";
 
 const router = Router();
 
@@ -118,6 +119,26 @@ router.post(
     // Bust entitlement cache
     await invalidateEntitlementCache(customerAddress);
 
+    // Fire subscription.created webhook
+    if (sub && res.locals.auth.developerId) {
+      try {
+        await fireWebhook({
+          developerId: res.locals.auth.developerId,
+          event:       "subscription.created",
+          payload: {
+            customer:  customerAddress,
+            planId:    String(planId),
+            txHash:    result.txHash,
+            status:    sub.status,
+            periodEnd: sub.current_period_end.toString(),
+          },
+        });
+      } catch (err) {
+        // Webhook failure must not break the response
+        console.error("[checkout] subscription.created webhook failed:", err);
+      }
+    }
+
     res.json({ txHash: result.txHash });
   })
 );
@@ -186,6 +207,23 @@ router.post(
     if (result.error) {
       res.status(502).json({ error: result.error });
       return;
+    }
+
+    // Fire vault.created webhook (best-effort)
+    if (res.locals.auth.developerId) {
+      try {
+        await fireWebhook({
+          developerId: res.locals.auth.developerId,
+          event:       "vault.created",
+          payload: {
+            customer:  customerAddress,
+            developer: res.locals.auth.developerAddress,
+            txHash:    result.txHash,
+          },
+        });
+      } catch (err) {
+        console.error("[checkout] vault.created webhook failed:", err);
+      }
     }
 
     res.json({ txHash: result.txHash });

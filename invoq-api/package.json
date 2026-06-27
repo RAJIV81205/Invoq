@@ -16,13 +16,13 @@
   "license": "ISC",
   "dependencies": {
     "@stellar/stellar-sdk": "^15.1.0",
-    "@upstash/redis": "^1.38.0",
     "bullmq": "^5.76.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
     "helmet": "^8.1.0",
+    "ioredis": "^5.8.1",
     "postgres": "^3.4.9"
   },
   "devDependencies": {

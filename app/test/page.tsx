@@ -14,6 +14,7 @@ const SECTIONS = [
   "Subscriptions",
   "Vault",
   "Webhooks",
+  "Dashboard APIs",
 ];
 
 export default function TestPage() {

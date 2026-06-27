@@ -5,6 +5,8 @@ import { startRenewalJob }            from "./src/jobs/renewal.js";
 import { startGraceExpiryJob }        from "./src/jobs/grace-expiry.js";
 import { startUsageFlushJob }         from "./src/jobs/usage-flush.js";
 import { startWebhookDeliveryWorker } from "./src/jobs/webhook-delivery.js";
+import { startRetryJob }              from "./src/jobs/retry.js";
+import { startTrialEndingJob }        from "./src/jobs/trial-ending.js";
 import type { Server } from "http";
 
 const log  = createLogger("main");
@@ -30,6 +32,10 @@ async function main(): Promise<void> {
   log.info("job started: usage-flush (every 5s)");
   startWebhookDeliveryWorker();
   log.info("job started: webhook-delivery (concurrency=10)");
+  startRetryJob();
+  log.info("job started: payment-retry (every 5min)");
+  startTrialEndingJob();
+  log.info("job started: trial-ending (every 6h)");
 
   // ── HTTP server ────────────────────────────────────────────────────────────
   const server: Server = app.listen(PORT, () => {

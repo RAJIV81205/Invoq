@@ -1,7 +1,25 @@
-export const SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS = "CCYREON6K2AGO5DRQMTW4MVNYBBOLOPZMP4RP7JY6H3FXUFQFH2SXQYA";
+/**
+ * src/config.ts
+ *
+ * Centralised contract addresses. Reads from env vars with sensible fallbacks
+ * for the deployed testnet. The dashboard's lib/config.ts mirrors these.
+ *
+ * IMPORTANT: SPEND_POLICY_CONTRACT_ADDRESS is the address of the deployed
+ * SpendPolicy contract on the target network. If the env var is missing the
+ * /v1/spend-policies routes will refuse to start.
+ */
 
-export const BILLING_CYCLE_CONTRACT_ADDRESS = "CCCFUSKCBHLVDWHLO7WYZ5EEC3QRYZLUQ5HWCPAGB7J5WKS3B2NOMKHO";
+export const SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS =
+  process.env.SUBSCRIPTION_REGISTRY_CONTRACT_ADDRESS ?? "";
 
-export const SPEND_POLICY_CONTRACT_ADDRESS = "CDTLW43XT55X5FZB3PPC5Y7UG6PSYC4LW3ZED23YIEIVDXVOT72QHFPG";
+export const BILLING_CYCLE_CONTRACT_ADDRESS =
+  process.env.BILLING_CYCLE_CONTRACT_ADDRESS ?? process.env.BILLING_CONTRACT_ID ?? "";
 
-export const ESCROW_VAULT_CONTRACT_ADDRESS = "CBANJOGMJZ3CAIHX45UWUTDUVXZIMUYOZPXNHYZLKKHZBQ5ZAR6L2LLO";
+export const SPEND_POLICY_CONTRACT_ADDRESS =
+  process.env.SPEND_POLICY_CONTRACT_ADDRESS ?? "";
+
+export const ESCROW_VAULT_CONTRACT_ADDRESS =
+  process.env.ESCROW_VAULT_CONTRACT_ADDRESS ?? process.env.ESCROW_VAULT_CONTRACT_ID ?? "";
+
+export const USDC_SAC_ADDRESS =
+  process.env.USDC_SAC_ADDRESS ?? "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";

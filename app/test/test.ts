@@ -809,4 +809,77 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
   } else {
     report(s7, skip("Cleanup: revoke rotated secret key", "no rotated secret key created"));
   }
+
+  // ── Section 8: Dashboard APIs ──────────────────────────────────────────────
+  // Exercises the new endpoints added in the dashboard integration.
+  const s8 = 8;
+
+  // 8.1 — Developer signup
+  {
+    const stamp = Date.now();
+    const signupRes = await fetch(`http://localhost:3001/v1/developers/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        stellarAddress: developerAddress,
+        email:          `e2e-${stamp}@invoq-test.dev`,
+        name:           `E2E Test ${stamp}`,
+      }),
+    });
+    report(s8, signupRes.status === 201
+      ? pass("POST /v1/developers/signup → 201")
+      : fail("POST /v1/developers/signup → 201", `Got ${signupRes.status}`));
+  }
+
+  // 8.2 — GET /v1/developers/me
+  {
+    const { result: r, ms } = await timed(() => api("GET", "/v1/developers/me"));
+    report(s8, r.data?.stellarAddress === developerAddress
+      ? pass("GET /v1/developers/me returns the current dev", undefined, undefined, ms)
+      : fail("GET /v1/developers/me returns the current dev", JSON.stringify(r.data)));
+  }
+
+  // 8.3 — GET /v1/plans (list)
+  {
+    const { result: r, ms } = await timed(() => api("GET", "/v1/plans"));
+    report(s8, Array.isArray(r.data?.plans)
+      ? pass("GET /v1/plans returns list", `count=${r.data.plans.length}`, undefined, ms)
+      : fail("GET /v1/plans returns list", JSON.stringify(r.data)));
+  }
+
+  // 8.4 — GET /v1/subscriptions (list)
+  {
+    const { result: r, ms } = await timed(() => api("GET", "/v1/subscriptions"));
+    report(s8, Array.isArray(r.data?.subscriptions)
+      ? pass("GET /v1/subscriptions returns list", `count=${r.data.subscriptions.length}`, undefined, ms)
+      : fail("GET /v1/subscriptions returns list", JSON.stringify(r.data)));
+  }
+
+  // 8.5 — GET /v1/vault/balances
+  {
+    const { result: r, ms } = await timed(() => api("GET", "/v1/vault/balances"));
+    report(s8, Array.isArray(r.data?.vaults)
+      ? pass("GET /v1/vault/balances returns list", `count=${r.data.vaults.length}`, undefined, ms)
+      : fail("GET /v1/vault/balances returns list", JSON.stringify(r.data)));
+  }
+
+  // 8.6 — Spend-policy check (public, no auth needed)
+  {
+    const { result: r, ms } = await timed(() => api("POST", "/v1/spend-policies/check", {
+      agent:       developerAddress,
+      destination: "GDESTINATIONXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      amountUsdc:  1000000,
+    }));
+    report(s8, typeof r.data?.allowed === "boolean"
+      ? pass("POST /v1/spend-policies/check works", `allowed=${r.data.allowed}`, undefined, ms)
+      : fail("POST /v1/spend-policies/check works", JSON.stringify(r.data)));
+  }
+
+  // 8.7 — Subscription history
+  {
+    const { result: r, ms } = await timed(() => api("GET", `/v1/subscriptions/${developerAddress}/history`));
+    report(s8, Array.isArray(r.data?.events)
+      ? pass("GET /v1/subscriptions/:addr/history", `events=${r.data.events.length}`, undefined, ms)
+      : fail("GET /v1/subscriptions/:addr/history", JSON.stringify(r.data)));
+  }
 }

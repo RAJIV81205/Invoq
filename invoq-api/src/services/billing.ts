@@ -1,10 +1,12 @@
-import { lt, eq } from "drizzle-orm";
+import { lt, eq, and } from "drizzle-orm";
 import { db, subscriptionCache, now } from "../lib/db/index.js";
-import { processRenewals, expireGracePeriods } from "../lib/stellar/billing.js";
+import { processRenewals, expireGracePeriods, retryPayment } from "../lib/stellar/billing.js";
 import {
   getGracePeriodCustomers,
   clearGracePeriod,
   invalidateEntitlementCache,
+  getTrialWarned,
+  setTrialWarned,
 } from "../lib/cache/redis.js";
 import { fireWebhook } from "./webhook.js";
 import { getSubscription } from "../lib/stellar/registry.js";
@@ -216,5 +218,144 @@ export async function runGraceExpiry(): Promise<void> {
     total:          customers.length,
     expired,
     contractErrors,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Trial-ending — fires trial.ending once per trial (Redis-deduped)
+//
+// Scans all active trial subscriptions and emits the event when the trial
+// ends within the next 72 hours. Dedupe key in Redis.
+// ─────────────────────────────────────────────────────────────────────────────
+const TRIAL_WARNING_WINDOW_SECS = 72 * 60 * 60; // 72h
+
+export async function runTrialEnding(): Promise<void> {
+  const rows = await db
+    .select()
+    .from(subscriptionCache)
+    .where(eq(subscriptionCache.status, "Trialing"));
+
+  if (rows.length === 0) return;
+
+  const nowSecs = BigInt(Math.floor(Date.now() / 1000));
+  let fired = 0;
+
+  for (const row of rows) {
+    const sub = await getSubscription(row.customerAddress);
+    if (!sub || sub.trial_end === 0n) continue;
+
+    const remaining = sub.trial_end - nowSecs;
+    if (remaining <= 0n || remaining > BigInt(TRIAL_WARNING_WINDOW_SECS)) continue;
+
+    const dedupeKey = sub.trial_end.toString();
+    const lastFired = await getTrialWarned(row.customerAddress);
+    if (lastFired === dedupeKey) continue;
+
+    await setTrialWarned(row.customerAddress, dedupeKey);
+
+    await fireWebhook({
+      developerId: row.developerId,
+      event:       "trial.ending",
+      payload: {
+        customer:  row.customerAddress,
+        planId:    sub.plan_id.toString(),
+        trialEnd:  sub.trial_end.toString(),
+        remaining: remaining.toString(),
+      },
+    });
+    fired++;
+  }
+
+  if (fired > 0) {
+    log.info("trial.ending fired", { count: fired, scanned: rows.length });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Retry cycle — retries payments for GracePeriod customers whose grace
+// window still has >= 12h. Fires payment.retry_succeeded on success.
+// ─────────────────────────────────────────────────────────────────────────────
+const RETRY_MIN_REMAINING_SECS = 12 * 60 * 60; // 12h
+
+export async function runRetryCycle(): Promise<void> {
+  const cycleStart = Date.now();
+  const customers  = await getGracePeriodCustomers();
+
+  if (customers.length === 0) {
+    log.debug("retry cycle: no grace customers");
+    return;
+  }
+
+  log.info("retry cycle: candidates", { count: customers.length });
+
+  let succeeded = 0;
+  let failed    = 0;
+
+  for (const customer of customers) {
+    const sub = await getSubscription(customer);
+    if (!sub || sub.status !== "GracePeriod") continue;
+
+    // Only retry if the grace window still has enough time
+    const nowSecs = BigInt(Math.floor(Date.now() / 1000));
+    if (sub.current_period_end === 0n) continue;
+    const remaining = sub.current_period_end - nowSecs;
+    if (remaining < BigInt(RETRY_MIN_REMAINING_SECS)) continue;
+
+    const result = await retryPayment(customer);
+
+    if (result.error) {
+      failed++;
+      log.warn("retry cycle: retryPayment failed", { customer, error: result.error });
+      continue;
+    }
+
+    if (result.succeeded === true) {
+      await clearGracePeriod(customer);
+      await invalidateEntitlementCache(customer);
+
+      // Refresh cache from chain
+      const fresh = await getSubscription(customer);
+      if (fresh) {
+        await db
+          .update(subscriptionCache)
+          .set({
+            status:             fresh.status,
+            currentPeriodStart: fromUnixSeconds(fresh.current_period_start),
+            currentPeriodEnd:   fromUnixSeconds(fresh.current_period_end),
+            usageCurrent:       Number(fresh.usage_current),
+            syncedAt:           now(),
+          })
+          .where(eq(subscriptionCache.customerAddress, customer));
+      }
+
+      const cacheRow = await db
+        .select()
+        .from(subscriptionCache)
+        .where(eq(subscriptionCache.customerAddress, customer))
+        .limit(1);
+      const row = cacheRow[0];
+      if (row) {
+        await fireWebhook({
+          developerId: row.developerId,
+          event:       "payment.retry_succeeded",
+          payload: {
+            customer:  customer,
+            planId:    sub.plan_id.toString(),
+            txHash:    result.txHash,
+            periodEnd: sub.current_period_end.toString(),
+          },
+        });
+      }
+      succeeded++;
+    } else {
+      failed++;
+    }
+  }
+
+  log.info("retry cycle: complete", {
+    durationMs: Date.now() - cycleStart,
+    total:      customers.length,
+    succeeded,
+    failed,
   });
 }

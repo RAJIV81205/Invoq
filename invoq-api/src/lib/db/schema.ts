@@ -70,6 +70,7 @@ export const developers = pgTable(
     stellarAddress: varchar("stellar_address", { length: 56 }).notNull(),
     email:          varchar("email", { length: 255 }).notNull(),
     name:           varchar("name", { length: 255 }).notNull(),
+    payoutAddress:  varchar("payout_address", { length: 56 }),
     createdAt:      timestamp("created_at").notNull().defaultNow(),
     updatedAt:      timestamp("updated_at").notNull().defaultNow(),
   },
