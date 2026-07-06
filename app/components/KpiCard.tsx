@@ -12,15 +12,15 @@ export default function KpiCard({
   positive?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5">
-      <div className="text-xs uppercase tracking-wider text-[var(--muted)] font-medium mb-2">
+    <div className="surface rounded-[1.5rem] p-5 transition hover:-translate-y-0.5 hover:border-white/20">
+      <div className="text-[0.72rem] uppercase tracking-[0.18em] text-[var(--muted)] font-semibold mb-2">
         {label}
       </div>
-      <div className="text-2xl font-semibold tracking-tight">{value}</div>
+      <div className="text-3xl font-semibold tracking-[-0.04em]">{value}</div>
       <div className="mt-1 flex items-center gap-2 text-xs">
         {delta && (
-          <span className={positive ? "text-emerald-400" : "text-rose-400"}>
-            {positive ? "▲" : "▼"} {delta}
+          <span className={positive ? "text-[var(--success)]" : "text-[var(--danger)]"}>
+            {positive ? "↗" : "↘"} {delta}
           </span>
         )}
         {hint && <span className="text-[var(--muted)]">{hint}</span>}

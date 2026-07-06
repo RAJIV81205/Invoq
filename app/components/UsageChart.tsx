@@ -11,7 +11,7 @@ export default function UsageChart({
 }) {
   if (data.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center text-sm text-[var(--muted)]">
+      <div className="surface-soft rounded-[1.5rem] p-6 text-center text-sm text-[var(--muted)]">
         No data
       </div>
     );
@@ -37,14 +37,14 @@ export default function UsageChart({
     <svg width={width} height={height} className="w-full h-auto">
       <defs>
         <linearGradient id="usageFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"  stopColor="var(--brand)" stopOpacity="0.45" />
+          <stop offset="0%" stopColor="var(--brand-glow)" stopOpacity="0.35" />
           <stop offset="100%" stopColor="var(--brand)" stopOpacity="0" />
         </linearGradient>
       </defs>
       <path d={areaPath} fill="url(#usageFill)" />
-      <path d={linePath} fill="none" stroke="var(--brand)" strokeWidth="2" />
+      <path d={linePath} fill="none" stroke="url(#usageFill)" strokeWidth="3" strokeLinecap="round" />
       {points.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r="3" fill="var(--brand)" />
+        <circle key={i} cx={p.x} cy={p.y} r="3.5" fill="var(--brand-glow)" />
       ))}
       {data.length <= 12 && points.map((p, i) => (
         <text

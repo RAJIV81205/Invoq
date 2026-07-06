@@ -34,7 +34,7 @@ export default function DeactivateButton({ planId, active }: { planId: string; a
       <button
         onClick={toggle}
         disabled={busy}
-        className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--card)] transition disabled:opacity-60"
+        className="button-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
       >
         {active ? "Deactivate" : "Reactivate"}
       </button>

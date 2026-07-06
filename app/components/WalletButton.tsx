@@ -33,8 +33,8 @@ export default function WalletButton() {
 
   if (address) {
     return (
-      <span className="inline-flex items-center gap-2 rounded-md bg-[var(--card)] border border-[var(--border)] px-3 py-1.5 text-sm font-mono">
-        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+      <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-mono text-[var(--foreground)]">
+        <span className="h-2 w-2 rounded-full bg-[var(--accent)] shadow-[0_0_20px_rgba(67,242,186,0.7)]" />
         {short(address)}
       </span>
     );
@@ -45,11 +45,11 @@ export default function WalletButton() {
       <button
         onClick={connect}
         disabled={busy}
-        className="rounded-md bg-[var(--brand)] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[var(--brand-glow)] transition disabled:opacity-60"
+        className="button-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? "Connecting…" : "Connect Wallet"}
       </button>
-      {err && <span className="text-xs text-rose-400">{err}</span>}
+      {err && <span className="text-xs text-[var(--danger)]">{err}</span>}
     </div>
   );
 }

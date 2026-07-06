@@ -62,7 +62,7 @@ export default function NewEndpointButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="rounded-md bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-glow)] transition"
+        className="button-primary px-4 py-2 text-sm"
       >
         Add endpoint
       </button>
@@ -79,24 +79,24 @@ export default function NewEndpointButton() {
         ) : (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1.5">URL (HTTPS)</label>
+              <label className="block text-sm font-medium mb-2">URL (HTTPS)</label>
               <input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://yourapp.com/webhooks/invoq"
-                className="w-full rounded-md bg-[var(--background)] border border-[var(--border)] px-3 py-2 text-sm font-mono"
+                className="input-shell font-mono"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">Events (empty = all)</label>
-              <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-md border border-[var(--border)] p-3">
+              <label className="block text-sm font-medium mb-2">Events (empty = all)</label>
+              <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto rounded-2xl border border-white/10 bg-white/4 p-3">
                 {ALL_EVENTS.map((ev) => (
-                  <label key={ev} className="flex items-center gap-2 text-sm font-mono cursor-pointer">
+                  <label key={ev} className="flex items-center gap-2 text-sm font-mono cursor-pointer rounded-xl px-2 py-1.5 hover:bg-white/5">
                     <input
                       type="checkbox"
                       checked={events.includes(ev)}
                       onChange={() => toggle(ev)}
-                      className="h-3.5 w-3.5 rounded border-[var(--border)]"
+                      className="h-3.5 w-3.5 rounded border-white/20 bg-transparent"
                     />
                     {ev}
                   </label>
@@ -104,16 +104,16 @@ export default function NewEndpointButton() {
               </div>
             </div>
             {err && (
-              <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+              <div className="rounded-2xl border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-4 py-3 text-sm text-rose-200">
                 {err}
               </div>
             )}
             <div className="flex justify-end gap-2">
-              <button onClick={close} className="rounded-md border border-[var(--border)] px-3 py-2 text-sm">Cancel</button>
+              <button onClick={close} className="button-secondary px-4 py-2 text-sm">Cancel</button>
               <button
                 onClick={submit}
                 disabled={busy || !url.startsWith("https://")}
-                className="rounded-md bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="button-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {busy ? "Creating…" : "Create endpoint"}
               </button>

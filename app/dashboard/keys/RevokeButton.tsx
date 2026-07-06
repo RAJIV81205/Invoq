@@ -20,7 +20,7 @@ export default function RevokeButton({ keyId }: { keyId: string }) {
     <button
       onClick={revoke}
       disabled={busy}
-      className="text-xs text-rose-400 hover:underline disabled:opacity-60"
+      className="rounded-full border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-3 py-1.5 text-xs font-semibold text-rose-200 transition hover:bg-[var(--danger)]/15 disabled:opacity-60"
     >
       {busy ? "Revoking…" : "Revoke"}
     </button>

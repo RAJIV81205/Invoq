@@ -13,9 +13,10 @@ export default async function VaultPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Vault</h1>
-        <p className="text-sm text-[var(--muted)] mt-1">
+      <div className="surface rounded-[2rem] p-6 sm:p-8">
+        <div className="eyebrow">Vault</div>
+        <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em]">Prepaid balances, tracked.</h1>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
           Prepaid USDC balances held in EscrowVault for usage-based billing.
         </p>
       </div>
@@ -26,9 +27,9 @@ export default async function VaultPage() {
           description="When a customer opens a vault and deposits USDC, it will appear here. Customers can close their vault at any time to refund the balance."
         />
       ) : (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+        <div className="table-shell">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-[var(--muted)] border-b border-[var(--border)]">
+            <thead className="text-left text-xs uppercase tracking-wider text-[var(--muted)] border-b border-white/10">
               <tr>
                 <th className="px-5 py-3 font-medium">Customer</th>
                 <th className="px-5 py-3 font-medium">Balance</th>
@@ -38,9 +39,9 @@ export default async function VaultPage() {
                 <th className="px-5 py-3 font-medium">Created</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--border)]">
+            <tbody className="divide-y divide-white/10">
               {vaults.map((v) => (
-                <tr key={v.customer} className="hover:bg-[var(--background)]/50">
+                <tr key={v.customer}>
                   <td className="px-5 py-3 font-mono text-xs">{short(v.customer)}</td>
                   <td className="px-5 py-3 font-medium">{fmtUsdc(v.balance_usdc)}</td>
                   <td className="px-5 py-3 text-[var(--muted)]">{fmtUsdc(v.total_deposited)}</td>

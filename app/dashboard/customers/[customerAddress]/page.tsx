@@ -19,12 +19,12 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link href="/dashboard/customers" className="text-sm text-[var(--brand)] hover:underline">← All customers</Link>
-        <div className="mt-2 flex items-start justify-between">
+      <div className="surface rounded-[2rem] p-6 sm:p-8">
+        <Link href="/dashboard/customers" className="text-sm font-medium text-[var(--brand-glow)] hover:text-white">← All customers</Link>
+        <div className="mt-4 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight font-mono break-all">{customerAddress}</h1>
-            <p className="text-sm text-[var(--muted)] mt-1">Customer detail</p>
+            <h1 className="text-2xl font-semibold tracking-[-0.04em] font-mono break-all sm:text-3xl">{customerAddress}</h1>
+            <p className="mt-2 text-sm text-[var(--muted)]">Customer detail</p>
           </div>
           {sub && <CustomerActions customerAddress={customerAddress} status={sub.status} />}
         </div>
@@ -32,37 +32,37 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
       {sub ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5">
-            <div className="text-xs uppercase text-[var(--muted)] mb-1">Status</div>
+          <div className="surface rounded-[1.5rem] p-5">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)] mb-1">Status</div>
             <div className="mt-1"><StatusPill status={sub.status} /></div>
           </div>
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5">
-            <div className="text-xs uppercase text-[var(--muted)] mb-1">Plan</div>
-            <div className="text-2xl font-semibold">#{sub.plan_id}</div>
+          <div className="surface rounded-[1.5rem] p-5">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)] mb-1">Plan</div>
+            <div className="text-2xl font-semibold tracking-[-0.04em]">#{sub.plan_id}</div>
           </div>
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5">
-            <div className="text-xs uppercase text-[var(--muted)] mb-1">Period ends</div>
-            <div className="text-lg font-medium">
+          <div className="surface rounded-[1.5rem] p-5">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)] mb-1">Period ends</div>
+            <div className="text-lg font-medium tracking-[-0.03em]">
               {new Date(Number(sub.current_period_end) * 1000).toLocaleString()}
             </div>
           </div>
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5">
-            <div className="text-xs uppercase text-[var(--muted)] mb-1">Usage this period</div>
-            <div className="text-2xl font-semibold">{Number(sub.usage_current).toLocaleString()}</div>
+          <div className="surface rounded-[1.5rem] p-5">
+            <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)] mb-1">Usage this period</div>
+            <div className="text-2xl font-semibold tracking-[-0.04em]">{Number(sub.usage_current).toLocaleString()}</div>
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 text-sm text-[var(--muted)]">
+        <div className="surface rounded-[1.5rem] p-5 text-sm text-[var(--muted)]">
           No subscription on-chain for this address.
         </div>
       )}
 
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
-        <div className="px-5 py-3 border-b border-[var(--border)]">
-          <h2 className="font-semibold">Webhook events</h2>
+      <div className="table-shell">
+        <div className="px-5 py-4 border-b border-white/10">
+          <h2 className="text-lg font-semibold tracking-[-0.03em]">Webhook events</h2>
         </div>
         {hist.events?.length > 0 ? (
-          <div className="divide-y divide-[var(--border)]">
+          <div className="divide-y divide-white/10">
             {hist.events.map((e: any) => (
               <div key={e.id} className="px-5 py-3 flex items-center gap-3 text-sm">
                 <StatusPill status={e.status} />

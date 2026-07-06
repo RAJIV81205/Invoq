@@ -28,22 +28,22 @@ export default function SecretKeyModal({
 
   return (
     <Modal open={open} onClose={onClose} title={title} size="lg">
-      <p className="text-sm text-[var(--muted)] mb-4">{description}</p>
-      <div className="relative rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 font-mono text-sm break-all">
+      <p className="text-sm text-[var(--muted)] mb-4 leading-6">{description}</p>
+      <div className="relative rounded-2xl border border-amber-400/20 bg-amber-400/6 p-4 font-mono text-sm break-all text-[var(--foreground)]">
         {secret}
         <button
           onClick={copy}
-          className="absolute top-2 right-2 rounded-md bg-[var(--border)] px-2 py-1 text-xs font-medium hover:bg-[var(--card)] transition"
+          className="absolute top-3 right-3 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-white/10 transition"
         >
           {copied ? "Copied!" : "Copy"}
         </button>
       </div>
-      <label className="mt-4 flex items-center gap-2 text-sm">
+      <label className="mt-4 flex items-center gap-3 text-sm text-[var(--foreground)]">
         <input
           type="checkbox"
           checked={confirmed}
           onChange={(e) => setConfirmed(e.target.checked)}
-          className="h-4 w-4 rounded border-[var(--border)] bg-[var(--background)]"
+          className="h-4 w-4 rounded border-white/20 bg-transparent"
         />
         I have stored this key in a secure location
       </label>
@@ -51,7 +51,7 @@ export default function SecretKeyModal({
         <button
           onClick={onClose}
           disabled={!confirmed}
-          className="rounded-md bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-glow)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="button-primary disabled:cursor-not-allowed disabled:opacity-50"
         >
           Continue
         </button>

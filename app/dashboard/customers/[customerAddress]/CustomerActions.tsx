@@ -36,7 +36,7 @@ export default function CustomerActions({ customerAddress, status }: { customerA
           <button
             onClick={() => call("/pause", "POST")}
             disabled={busy}
-            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--card)] transition disabled:opacity-60"
+            className="button-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
           >
             Pause
           </button>
@@ -45,7 +45,7 @@ export default function CustomerActions({ customerAddress, status }: { customerA
           <button
             onClick={() => call("/resume", "POST")}
             disabled={busy}
-            className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--card)] transition disabled:opacity-60"
+            className="button-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
           >
             Resume
           </button>
@@ -54,7 +54,7 @@ export default function CustomerActions({ customerAddress, status }: { customerA
           <button
             onClick={() => call("?immediate=true", "DELETE")}
             disabled={busy}
-            className="rounded-md border border-rose-500/40 px-3 py-1.5 text-sm font-medium text-rose-300 hover:bg-rose-500/10 transition disabled:opacity-60"
+            className="rounded-full border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-[var(--danger)]/15 disabled:opacity-60"
           >
             Cancel
           </button>

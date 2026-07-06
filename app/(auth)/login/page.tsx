@@ -43,14 +43,17 @@ function LoginForm() {
   }
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-8 shadow-2xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
-      <p className="mt-1 text-sm text-[var(--muted)]">
-        Sign in with the email you used to sign up. We&apos;ll issue a fresh secret key you can use right away.
+    <div className="surface-strong w-full max-w-md rounded-[2rem] p-7 sm:p-8">
+      <div className="eyebrow">Sign in</div>
+      <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em]">Welcome back.</h1>
+      <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+        Use the email tied to your developer account. We&apos;ll reissue a fresh key if the session is
+        missing.
       </p>
+
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1.5" htmlFor="email">
+          <label className="mb-2 block text-sm font-medium" htmlFor="email">
             Email
           </label>
           <input
@@ -59,26 +62,27 @@ function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-md bg-[var(--background)] border border-[var(--border)] px-3 py-2 text-sm focus:border-[var(--brand)] focus:outline-none focus:ring-1 focus:ring-[var(--brand)]"
+            className="input-shell"
             placeholder="you@example.com"
           />
         </div>
         {error && (
-          <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+          <div className="rounded-2xl border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-4 py-3 text-sm text-rose-200">
             {error}
           </div>
         )}
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-md bg-[var(--brand)] py-2.5 text-sm font-semibold text-white hover:bg-[var(--brand-glow)] transition disabled:opacity-60"
+          className="button-primary w-full disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Signing in…" : "Sign in"}
+          {submitting ? "Signing in..." : "Sign in"}
         </button>
       </form>
-      <p className="mt-5 text-center text-sm text-[var(--muted)]">
+
+      <p className="mt-6 text-center text-sm text-[var(--muted)]">
         No account?{" "}
-        <Link href="/signup" className="text-[var(--brand)] hover:underline">
+        <Link href="/signup" className="font-medium text-[var(--foreground)] hover:text-white">
           Create one
         </Link>
       </p>
@@ -88,7 +92,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-8 shadow-2xl" />}>
+    <Suspense fallback={<div className="surface-strong h-[28rem] w-full max-w-md rounded-[2rem]" />}>
       <LoginForm />
     </Suspense>
   );

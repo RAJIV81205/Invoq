@@ -30,15 +30,16 @@ export default async function UsagePage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Usage</h1>
-        <p className="text-sm text-[var(--muted)] mt-1">
+      <div className="surface rounded-[2rem] p-6 sm:p-8">
+        <div className="eyebrow">Usage</div>
+        <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em]">Consumption across plans.</h1>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
           Aggregated consumption across your plans.
         </p>
       </div>
 
       <div>
-        <h2 className="font-semibold mb-3">By plan</h2>
+        <h2 className="mb-3 text-lg font-semibold tracking-[-0.03em]">By plan</h2>
         {byPlan.size === 0 ? (
           <EmptyState
             title="No usage yet"
@@ -47,9 +48,9 @@ export default async function UsagePage() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from(byPlan.entries()).map(([planId, agg]) => (
-              <div key={planId} className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5">
-                <div className="text-xs uppercase text-[var(--muted)] mb-1">Plan #{planId}</div>
-                <div className="text-lg font-semibold">{agg.name}</div>
+              <div key={planId} className="surface rounded-[1.5rem] p-5">
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)] mb-1">Plan #{planId}</div>
+                <div className="text-lg font-semibold tracking-[-0.03em]">{agg.name}</div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                   <div>
                     <div className="text-xs text-[var(--muted)]">Total usage</div>
@@ -67,15 +68,15 @@ export default async function UsagePage() {
       </div>
 
       <div>
-        <h2 className="font-semibold mb-3">Top consumers (current period)</h2>
+        <h2 className="mb-3 text-lg font-semibold tracking-[-0.03em]">Top consumers (current period)</h2>
         {leaderboard.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center text-sm text-[var(--muted)]">
+          <div className="surface-soft rounded-[1.5rem] p-6 text-center text-sm text-[var(--muted)]">
             No data
           </div>
         ) : (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+          <div className="table-shell">
             <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-[var(--muted)] border-b border-[var(--border)]">
+              <thead className="text-left text-xs uppercase tracking-wider text-[var(--muted)] border-b border-white/10">
                 <tr>
                   <th className="px-5 py-3 font-medium">Customer</th>
                   <th className="px-5 py-3 font-medium">Plan</th>
@@ -83,7 +84,7 @@ export default async function UsagePage() {
                   <th className="px-5 py-3 font-medium text-right">Usage</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border)]">
+              <tbody className="divide-y divide-white/10">
                 {leaderboard.map((s) => (
                   <tr key={s.customerAddress}>
                     <td className="px-5 py-3 font-mono text-xs">{short(s.customerAddress)}</td>

@@ -75,11 +75,23 @@ export default async function DashboardOverviewPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
-        <p className="text-sm text-[var(--muted)] mt-1">
-          Your subscription business at a glance.
-        </p>
+      <div className="surface rounded-[2rem] p-6 sm:p-8">
+        <div className="eyebrow">Overview</div>
+        <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <h1 className="text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">
+              Your revenue engine, at a glance.
+            </h1>
+            <p className="mt-3 text-base leading-7 text-[var(--muted)]">
+              MRR, subscriptions, usage, and recent delivery activity in one calm control room.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs text-[var(--muted)]">
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2">Live API</span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2">Redis cache</span>
+            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-2">Webhook delivery</span>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -90,47 +102,47 @@ export default async function DashboardOverviewPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-xl border border-[var(--border)] bg-[var(--card)] p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Renewals · last 7 days</h2>
+        <div className="lg:col-span-2 surface rounded-[1.75rem] p-5 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold tracking-[-0.03em]">Renewals · last 7 days</h2>
             <span className="text-xs text-[var(--muted)]">payment.renewed events</span>
           </div>
           <UsageChart data={days} height={160} />
         </div>
 
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5">
-          <h2 className="font-semibold mb-3">Quick actions</h2>
+        <div className="surface rounded-[1.75rem] p-5 sm:p-6">
+          <h2 className="text-lg font-semibold tracking-[-0.03em] mb-4">Quick actions</h2>
           <div className="space-y-2">
             <Link
               href="/dashboard/plans"
-              className="block rounded-md border border-[var(--border)] px-3 py-2 text-sm hover:bg-[var(--background)] transition"
+              className="block rounded-2xl border border-white/10 bg-white/4 px-4 py-3 text-sm transition hover:bg-white/7"
             >
               <span className="font-medium">Create a plan</span>
-              <p className="text-xs text-[var(--muted)] mt-0.5">Define pricing, intervals, features.</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">Define pricing, intervals, features.</p>
             </Link>
             <Link
               href="/dashboard/webhooks"
-              className="block rounded-md border border-[var(--border)] px-3 py-2 text-sm hover:bg-[var(--background)] transition"
+              className="block rounded-2xl border border-white/10 bg-white/4 px-4 py-3 text-sm transition hover:bg-white/7"
             >
               <span className="font-medium">Register webhook</span>
-              <p className="text-xs text-[var(--muted)] mt-0.5">Receive billing events in your backend.</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">Receive billing events in your backend.</p>
             </Link>
             <Link
               href="/dashboard/keys"
-              className="block rounded-md border border-[var(--border)] px-3 py-2 text-sm hover:bg-[var(--background)] transition"
+              className="block rounded-2xl border border-white/10 bg-white/4 px-4 py-3 text-sm transition hover:bg-white/7"
             >
               <span className="font-medium">Mint publishable key</span>
-              <p className="text-xs text-[var(--muted)] mt-0.5">Use pk_ keys safely in the browser.</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">Use pk_ keys safely in the browser.</p>
             </Link>
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--border)]">
-          <h2 className="font-semibold">Recent activity</h2>
-          <Link href="/dashboard/webhooks" className="text-xs text-[var(--brand)] hover:underline">
-            See all →
+      <div className="table-shell">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+          <h2 className="text-lg font-semibold tracking-[-0.03em]">Recent activity</h2>
+          <Link href="/dashboard/webhooks" className="text-xs font-medium text-[var(--brand-glow)] hover:text-white">
+            See all
           </Link>
         </div>
         {deliveries.length === 0 ? (
@@ -141,7 +153,7 @@ export default async function DashboardOverviewPage() {
             />
           </div>
         ) : (
-          <div className="divide-y divide-[var(--border)]">
+          <div className="divide-y divide-white/10">
             {deliveries.map((d: any) => (
               <div key={d.id} className="px-5 py-3 flex items-center gap-3">
                 <StatusPill status={d.status} />

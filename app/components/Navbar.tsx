@@ -15,25 +15,25 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-40 w-full border-b border-[var(--border)] bg-[var(--background)]/80 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+    <nav className="fixed top-0 left-0 right-0 z-40 w-full px-4 pt-4 sm:px-5 sm:pt-5">
+      <div className="mx-auto flex max-w-7xl items-center justify-between rounded-full border border-white/10 bg-[rgba(5,8,22,0.58)] px-4 py-3 shadow-2xl shadow-slate-950/20 backdrop-blur-2xl sm:px-5">
         <Link href="/" className="flex items-center gap-2 group">
-          <div className="grid h-8 w-8 place-items-center rounded-md bg-gradient-to-br from-[var(--brand)] to-[var(--accent)] text-white font-bold text-sm glow">
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-[var(--brand)] via-[#8fb3ff] to-[var(--accent)] text-[0.7rem] font-black text-slate-950 shadow-lg shadow-cyan-500/20 glow">
             IQ
           </div>
-          <span className="font-semibold text-lg tracking-tight">Invoq</span>
+          <span className="text-lg font-semibold tracking-[-0.03em]">Invoq</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-1">
+        <div className="hidden md:flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
           {links.map((l) => {
             const active = pathname === l.href || (l.href !== "/" && pathname.startsWith(l.href));
             return (
               <Link
                 key={l.href}
                 href={l.href}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                   active
-                    ? "bg-[var(--card)] text-[var(--foreground)]"
+                    ? "bg-[rgba(255,255,255,0.08)] text-[var(--foreground)] shadow-sm"
                     : "text-[var(--muted)] hover:text-[var(--foreground)]"
                 }`}
               >
@@ -46,13 +46,13 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-2">
           <Link
             href="/login"
-            className="rounded-md px-3 py-1.5 text-sm font-medium text-[var(--muted)] hover:text-[var(--foreground)]"
+            className="button-ghost px-4 py-2"
           >
             Log in
           </Link>
           <Link
             href="/signup"
-            className="rounded-md bg-[var(--brand)] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[var(--brand-glow)] transition"
+            className="button-primary px-4 py-2 text-sm"
           >
             Sign up
           </Link>
@@ -70,19 +70,19 @@ export default function Navbar() {
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-[var(--border)] px-6 py-3 flex flex-col gap-2">
+        <div className="md:hidden border-t border-white/10 px-6 py-4 flex flex-col gap-2 bg-[rgba(5,8,22,0.92)]">
           {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
               onClick={() => setOpen(false)}
-              className="text-sm font-medium text-[var(--muted)] hover:text-[var(--foreground)] py-1"
+              className="rounded-xl px-3 py-2 text-sm font-medium text-[var(--muted)] hover:bg-white/5 hover:text-[var(--foreground)]"
             >
               {l.label}
             </Link>
           ))}
-          <Link href="/login"  className="text-sm font-medium text-[var(--muted)] py-1">Log in</Link>
-          <Link href="/signup" className="text-sm font-medium text-[var(--brand)] py-1">Sign up</Link>
+          <Link href="/login" className="rounded-xl px-3 py-2 text-sm font-medium text-[var(--muted)]">Log in</Link>
+          <Link href="/signup" className="rounded-xl px-3 py-2 text-sm font-semibold text-[var(--foreground)]">Sign up</Link>
         </div>
       )}
     </nav>

@@ -13,9 +13,10 @@ export default async function CustomersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Customers</h1>
-        <p className="text-sm text-[var(--muted)] mt-1">
+      <div className="surface rounded-[2rem] p-6 sm:p-8">
+        <div className="eyebrow">Customers</div>
+        <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em]">Subscribers in one place.</h1>
+        <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
           {subs.length} subscriber{subs.length === 1 ? "" : "s"} on your plans.
         </p>
       </div>
@@ -26,9 +27,9 @@ export default async function CustomersPage() {
           description="Once a customer signs up for one of your plans, they'll appear here with their current period, usage, and status."
         />
       ) : (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+        <div className="table-shell">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-[var(--muted)] border-b border-[var(--border)]">
+            <thead className="text-left text-xs uppercase tracking-wider text-[var(--muted)] border-b border-white/10">
               <tr>
                 <th className="px-5 py-3 font-medium">Customer</th>
                 <th className="px-5 py-3 font-medium">Plan</th>
@@ -38,9 +39,9 @@ export default async function CustomersPage() {
                 <th className="px-5 py-3 font-medium"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--border)]">
+            <tbody className="divide-y divide-white/10">
               {subs.map((s) => (
-                <tr key={s.customerAddress} className="hover:bg-[var(--background)]/50">
+                <tr key={s.customerAddress}>
                   <td className="px-5 py-3 font-mono text-xs">
                     <Link href={`/dashboard/customers/${s.customerAddress}`} className="hover:text-[var(--brand)]">
                       {short(s.customerAddress)}
@@ -57,9 +58,9 @@ export default async function CustomersPage() {
                   <td className="px-5 py-3 text-right">
                     <Link
                       href={`/dashboard/customers/${s.customerAddress}`}
-                      className="text-xs text-[var(--brand)] hover:underline"
+                      className="text-xs font-medium text-[var(--brand-glow)] hover:text-white"
                     >
-                      View →
+                      View
                     </Link>
                   </td>
                 </tr>

@@ -28,29 +28,32 @@ const ICONS: Record<string, React.ReactNode> = {
 export default function Sidebar() {
   const pathname = usePathname();
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--background)]">
-      <div className="px-5 py-5 border-b border-[var(--border)]">
+    <aside className="hidden md:flex w-72 shrink-0 flex-col border-r border-white/10 bg-[rgba(5,8,22,0.56)] backdrop-blur-xl">
+      <div className="px-5 py-6 border-b border-white/10">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-[var(--brand)] to-[var(--accent)] text-white font-bold text-xs">
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-[var(--brand)] via-[#8fb3ff] to-[var(--accent)] text-[0.68rem] font-black text-slate-950 shadow-lg shadow-cyan-500/20">
             IQ
           </div>
-          <span className="font-semibold">Invoq</span>
+          <div>
+            <div className="text-sm font-semibold tracking-[-0.02em]">Invoq</div>
+            <div className="text-xs text-[var(--muted)]">Billing ops</div>
+          </div>
         </Link>
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
+      <nav className="flex-1 px-3 py-4 space-y-1">
         {nav.map((item) => {
           const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition ${
+              className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm transition ${
                 active
-                  ? "bg-[var(--card)] text-[var(--foreground)] font-medium"
-                  : "text-[var(--muted)] hover:bg-[var(--card)]/60 hover:text-[var(--foreground)]"
+                  ? "bg-white/8 text-[var(--foreground)] shadow-sm ring-1 ring-white/8"
+                  : "text-[var(--muted)] hover:bg-white/4 hover:text-[var(--foreground)]"
               }`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-4 h-4 ${active ? "text-[var(--brand-glow)]" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {ICONS[item.icon]}
               </svg>
               {item.label}
@@ -58,7 +61,7 @@ export default function Sidebar() {
           );
         })}
       </nav>
-      <div className="border-t border-[var(--border)] px-4 py-3 text-xs text-[var(--muted)]">
+      <div className="border-t border-white/10 px-4 py-4 text-xs text-[var(--muted)]">
         <Link href="/" className="hover:text-[var(--foreground)]">← Back to site</Link>
       </div>
     </aside>

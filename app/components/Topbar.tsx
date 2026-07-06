@@ -22,18 +22,21 @@ export default function Topbar({
   }
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-[var(--border)] bg-[var(--background)]/85 backdrop-blur px-6 py-3">
-      <div className="text-sm text-[var(--muted)]">
-        Signed in as <span className="text-[var(--foreground)] font-medium">{email}</span>
+    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-[rgba(5,8,22,0.7)] px-6 py-4 backdrop-blur-xl">
+      <div>
+        <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Workspace</div>
+        <div className="text-sm text-[var(--foreground)]">
+          Signed in as <span className="font-medium">{email}</span>
+        </div>
       </div>
       <div className="flex items-center gap-3">
-        <span className="hidden sm:inline-flex items-center gap-2 rounded-md bg-[var(--card)] border border-[var(--border)] px-3 py-1.5 text-sm font-mono">
-          <span className="h-2 w-2 rounded-full bg-emerald-400" />
+        <span className="hidden sm:inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-mono text-[var(--foreground)]">
+          <span className="h-2 w-2 rounded-full bg-[var(--accent)] shadow-[0_0_20px_rgba(67,242,186,0.75)]" />
           {short(stellarAddress)}
         </span>
         <button
           onClick={logout}
-          className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm font-medium hover:bg-[var(--card)] transition"
+          className="button-secondary px-4 py-2 text-sm"
         >
           Log out
         </button>

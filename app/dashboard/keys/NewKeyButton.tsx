@@ -43,7 +43,7 @@ export default function NewKeyButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="rounded-md bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-glow)] transition"
+        className="button-primary px-4 py-2 text-sm"
       >
         New key
       </button>
@@ -59,30 +59,30 @@ export default function NewKeyButton() {
         ) : (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1.5">Name (optional)</label>
+              <label className="block text-sm font-medium mb-2">Name (optional)</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. production-server"
-                className="w-full rounded-md bg-[var(--background)] border border-[var(--border)] px-3 py-2 text-sm"
+                className="input-shell"
               />
             </div>
             {err && (
-              <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{err}</div>
+              <div className="rounded-2xl border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-4 py-3 text-sm text-rose-200">{err}</div>
             )}
             <div className="flex justify-end gap-2">
-              <button onClick={close} className="rounded-md border border-[var(--border)] px-3 py-2 text-sm">Cancel</button>
+              <button onClick={close} className="button-secondary px-4 py-2 text-sm">Cancel</button>
               <button
                 onClick={() => mint("publishable")}
                 disabled={busy}
-                className="rounded-md border border-[var(--border)] px-3 py-2 text-sm font-medium hover:bg-[var(--card)] transition disabled:opacity-60"
+                className="button-secondary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {busy ? "…" : "Create publishable (pk_)"}
               </button>
               <button
                 onClick={() => mint("secret")}
                 disabled={busy}
-                className="rounded-md bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="button-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {busy ? "…" : "Create secret (sk_)"}
               </button>

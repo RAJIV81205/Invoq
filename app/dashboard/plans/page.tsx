@@ -26,14 +26,17 @@ export default async function PlansPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Plans</h1>
-          <p className="text-sm text-[var(--muted)] mt-1">
-            Pricing tiers you&apos;ve created. Existing subscribers are unaffected by edits.
-          </p>
+      <div className="surface rounded-[2rem] p-6 sm:p-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="eyebrow">Plans</div>
+            <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em]">Pricing that ships cleanly.</h1>
+            <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
+              Pricing tiers you&apos;ve created. Existing subscribers are unaffected by edits.
+            </p>
+          </div>
+          <NewPlanButton stellarAddress={session.developer.stellarAddress} />
         </div>
-        <NewPlanButton stellarAddress={session.developer.stellarAddress} />
       </div>
 
       {plans.length === 0 ? (
@@ -43,9 +46,9 @@ export default async function PlansPage() {
           action={<NewPlanButton stellarAddress={session.developer.stellarAddress} />}
         />
       ) : (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+        <div className="table-shell">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-[var(--muted)] border-b border-[var(--border)]">
+            <thead className="text-left text-xs uppercase tracking-wider text-[var(--muted)] border-b border-white/10">
               <tr>
                 <th className="px-5 py-3 font-medium">Name</th>
                 <th className="px-5 py-3 font-medium">Price</th>
@@ -56,9 +59,9 @@ export default async function PlansPage() {
                 <th className="px-5 py-3 font-medium"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--border)]">
+            <tbody className="divide-y divide-white/10">
               {plans.map((p) => (
-                <tr key={p.plan_id} className="hover:bg-[var(--background)]/50">
+                <tr key={p.plan_id}>
                   <td className="px-5 py-3 font-medium">
                     <Link href={`/dashboard/plans/${p.plan_id}`} className="hover:text-[var(--brand)]">
                       {p.name}
@@ -77,8 +80,8 @@ export default async function PlansPage() {
                     <StatusPill status={p.active ? "Active" : "Cancelled"} />
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <Link href={`/dashboard/plans/${p.plan_id}`} className="text-xs text-[var(--brand)] hover:underline">
-                      View →
+                    <Link href={`/dashboard/plans/${p.plan_id}`} className="text-xs font-medium text-[var(--brand-glow)] hover:text-white">
+                      View
                     </Link>
                   </td>
                 </tr>

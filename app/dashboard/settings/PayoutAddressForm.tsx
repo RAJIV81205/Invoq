@@ -37,7 +37,7 @@ export default function PayoutAddressForm({ initial, isValid }: { initial: strin
         value={value}
         onChange={(e) => setValue(e.target.value)}
         pattern="^G[0-9A-Z]{55}$"
-        className="w-full rounded-md bg-[var(--background)] border border-[var(--border)] px-3 py-2 text-sm font-mono"
+        className="input-shell font-mono"
       />
       {!isValid && value && (
         <p className="text-xs text-rose-400">Address must be a 56-character Stellar G... address.</p>
@@ -47,7 +47,7 @@ export default function PayoutAddressForm({ initial, isValid }: { initial: strin
       <button
         onClick={save}
         disabled={busy || !value.startsWith("G")}
-        className="rounded-md bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+        className="button-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? "Saving…" : "Save"}
       </button>

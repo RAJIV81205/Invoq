@@ -10,24 +10,27 @@ export default async function KeysPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">API keys</h1>
-          <p className="text-sm text-[var(--muted)] mt-1">
-            Secret (sk_) keys for your server. Publishable (pk_) keys for the browser.
-          </p>
+      <div className="surface rounded-[2rem] p-6 sm:p-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="eyebrow">API keys</div>
+            <h1 className="mt-4 text-4xl font-semibold tracking-[-0.05em]">Keys with clear intent.</h1>
+            <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
+              Secret (sk_) keys for your server. Publishable (pk_) keys for the browser.
+            </p>
+          </div>
+          <NewKeyButton />
         </div>
-        <NewKeyButton />
       </div>
 
       {keys.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[var(--border)] p-10 text-center text-sm text-[var(--muted)]">
+        <div className="surface-soft rounded-[1.5rem] p-10 text-center text-sm text-[var(--muted)]">
           No keys yet.
         </div>
       ) : (
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden">
+        <div className="table-shell">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-[var(--muted)] border-b border-[var(--border)]">
+            <thead className="text-left text-xs uppercase tracking-wider text-[var(--muted)] border-b border-white/10">
               <tr>
                 <th className="px-5 py-3 font-medium">Name</th>
                 <th className="px-5 py-3 font-medium">Type</th>
@@ -38,7 +41,7 @@ export default async function KeysPage() {
                 <th className="px-5 py-3 font-medium"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--border)]">
+            <tbody className="divide-y divide-white/10">
               {keys.map((k) => (
                 <tr key={k.id}>
                   <td className="px-5 py-3 font-medium">{k.name ?? "—"}</td>

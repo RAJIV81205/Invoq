@@ -61,22 +61,22 @@ export default function NewPlanButton({ stellarAddress }: { stellarAddress: stri
     <>
       <button
         onClick={() => setOpen(true)}
-        className="rounded-md bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--brand-glow)] transition"
+        className="button-primary px-4 py-2 text-sm"
       >
         New plan
       </button>
       <Modal open={open} onClose={close} title="Create plan" size="lg">
         {txInfo ? (
           <div className="space-y-3">
-            <p className="text-sm text-emerald-400">Plan created on-chain.</p>
-            <div className="rounded-md border border-[var(--border)] p-3 text-sm">
+            <p className="text-sm text-[var(--success)]">Plan created on-chain.</p>
+            <div className="surface-soft rounded-2xl p-4 text-sm">
               <div><span className="text-[var(--muted)]">Plan ID:</span> <span className="font-mono">{txInfo.planId}</span></div>
               <div className="mt-1 break-all"><span className="text-[var(--muted)]">Tx hash:</span> <span className="font-mono text-xs">{txInfo.txHash}</span></div>
             </div>
             <div className="flex justify-end">
               <button
                 onClick={close}
-                className="rounded-md bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white"
+                className="button-primary px-4 py-2 text-sm"
               >
                 Done
               </button>
@@ -85,82 +85,82 @@ export default function NewPlanButton({ stellarAddress }: { stellarAddress: stri
         ) : (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1.5">Name</label>
+              <label className="block text-sm font-medium mb-2">Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="API Pro"
-                className="w-full rounded-md bg-[var(--background)] border border-[var(--border)] px-3 py-2 text-sm"
+                className="input-shell"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1.5">Price (USDC)</label>
+                <label className="block text-sm font-medium mb-2">Price (USDC)</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   value={priceUsdc}
                   onChange={(e) => setPriceUsdc(e.target.value)}
-                  className="w-full rounded-md bg-[var(--background)] border border-[var(--border)] px-3 py-2 text-sm"
+                  className="input-shell"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">Interval (days)</label>
+                <label className="block text-sm font-medium mb-2">Interval (days)</label>
                 <input
                   type="number"
                   min="1"
                   value={intervalDays}
                   onChange={(e) => setIntervalDays(e.target.value)}
-                  className="w-full rounded-md bg-[var(--background)] border border-[var(--border)] px-3 py-2 text-sm"
+                  className="input-shell"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">Trial (days, 0 = none)</label>
+                <label className="block text-sm font-medium mb-2">Trial (days, 0 = none)</label>
                 <input
                   type="number"
                   min="0"
                   value={trialDays}
                   onChange={(e) => setTrialDays(e.target.value)}
-                  className="w-full rounded-md bg-[var(--background)] border border-[var(--border)] px-3 py-2 text-sm"
+                  className="input-shell"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">Usage limit (0 = unlimited)</label>
+                <label className="block text-sm font-medium mb-2">Usage limit (0 = unlimited)</label>
                 <input
                   type="number"
                   min="0"
                   value={usageLimit}
                   onChange={(e) => setUsageLimit(e.target.value)}
-                  className="w-full rounded-md bg-[var(--background)] border border-[var(--border)] px-3 py-2 text-sm"
+                  className="input-shell"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">Features (comma-separated)</label>
+              <label className="block text-sm font-medium mb-2">Features (comma-separated)</label>
               <input
                 value={features}
                 onChange={(e) => setFeatures(e.target.value)}
                 placeholder="api_access, webhooks, export"
-                className="w-full rounded-md bg-[var(--background)] border border-[var(--border)] px-3 py-2 text-sm"
+                className="input-shell font-mono"
               />
             </div>
             {err && (
-              <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+              <div className="rounded-2xl border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-4 py-3 text-sm text-rose-200">
                 {err}
               </div>
             )}
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={close}
-                className="rounded-md border border-[var(--border)] px-3 py-2 text-sm"
+                className="button-secondary px-4 py-2 text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={submit}
                 disabled={busy || !name}
-                className="rounded-md bg-[var(--brand)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="button-primary px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {busy ? "Submitting…" : "Create plan"}
               </button>
