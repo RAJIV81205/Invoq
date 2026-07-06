@@ -11,7 +11,6 @@
 
 import { Router } from "express";
 import { StrKey } from "@stellar/stellar-sdk";
-import { desc, eq } from "drizzle-orm";
 import { authenticate } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/error.js";
 import {
@@ -23,10 +22,11 @@ import {
 import { invalidateEntitlementCache } from "../lib/cache/redis.js";
 import { getAdminPublicKey } from "../lib/stellar/client.js";
 import {
-  db,
-  subscriptionCache,
-  webhookDeliveries,
-  transactionLog,
+  findSubscriptionCacheByCustomer,
+  listSubscriptionCacheByDeveloperAddress,
+  listWebhookDeliveriesByDeveloper,
+  listTransactionLogByDeveloper,
+  updateSubscriptionCache,
 } from "../lib/db/index.js";
 import { createLogger } from "../lib/logger.js";
 
@@ -48,11 +48,7 @@ router.get(
       return;
     }
 
-    const rows = await db
-      .select()
-      .from(subscriptionCache)
-      .where(eq(subscriptionCache.developerAddress, developerAddress))
-      .orderBy(desc(subscriptionCache.syncedAt));
+    const rows = await listSubscriptionCacheByDeveloperAddress(developerAddress);
 
     res.json({
       count: rows.length,
@@ -133,24 +129,14 @@ router.get(
       return;
     }
 
-    const deliveryRows = await db
-      .select()
-      .from(webhookDeliveries)
-      .where(eq(webhookDeliveries.developerId, developerId))
-      .orderBy(desc(webhookDeliveries.createdAt))
-      .limit(50);
+    const deliveryRows = await listWebhookDeliveriesByDeveloper(developerId);
     const events = deliveryRows.filter((row) => payloadMatchesCustomer(row.payload, customerAddress));
 
     // On-chain transaction log rows for this customer (best-effort).
     // transaction_log has no customerAddress column; we filter by developer
     // and rely on the recent tx hash from cache to attach. For now we return
     // a structured empty list — webhook events carry the payment timeline.
-    const txRows = await db
-      .select()
-      .from(transactionLog)
-      .where(eq(transactionLog.developerId, developerId))
-      .orderBy(desc(transactionLog.createdAt))
-      .limit(50);
+    const txRows = await listTransactionLogByDeveloper(developerId);
 
     res.json({
       subscription: sub
@@ -268,10 +254,7 @@ router.post(
     await invalidateEntitlementCache(customerAddress);
 
     // Mark in cache
-    await db
-      .update(subscriptionCache)
-      .set({ status: "Paused", cancelAtPeriodEnd: true, syncedAt: new Date() })
-      .where(eq(subscriptionCache.customerAddress, customerAddress));
+    await updateSubscriptionCache(customerAddress, { status: "Paused", cancelAtPeriodEnd: true, syncedAt: new Date() });
 
     log.info("subscription paused", { customerAddress, txHash: result.txHash });
     res.json({ customerAddress, status: "Paused", txHash: result.txHash });
@@ -304,10 +287,7 @@ router.post(
     if (result.error) { res.status(502).json({ error: result.error }); return; }
     await invalidateEntitlementCache(customerAddress);
 
-    await db
-      .update(subscriptionCache)
-      .set({ status: "Active", cancelAtPeriodEnd: false, syncedAt: new Date() })
-      .where(eq(subscriptionCache.customerAddress, customerAddress));
+    await updateSubscriptionCache(customerAddress, { status: "Active", cancelAtPeriodEnd: false, syncedAt: new Date() });
 
     log.info("subscription resumed", { customerAddress, txHash: result.txHash });
     res.json({ customerAddress, status: "Active", txHash: result.txHash });
@@ -319,12 +299,8 @@ export default router;
 async function getAuthorizedSubscription(customerAddress: string, developerAddress?: string | null) {
   if (!developerAddress) return null;
 
-  const cached = await db
-    .select()
-    .from(subscriptionCache)
-    .where(eq(subscriptionCache.customerAddress, customerAddress))
-    .limit(1);
-  if (cached[0]?.developerAddress === developerAddress) {
+  const cached = await findSubscriptionCacheByCustomer(customerAddress);
+  if (cached?.developerAddress === developerAddress) {
     return getSubscription(customerAddress);
   }
 

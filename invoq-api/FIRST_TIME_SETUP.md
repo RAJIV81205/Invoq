@@ -60,7 +60,8 @@ PORT=3001
 STELLAR_NETWORK=testnet
 STELLAR_RPC_URL=
 STELLAR_ADMIN_SECRET=
-DATABASE_URL=
+MONGODB_URI=
+MONGODB_DB=invoq
 REDIS_URL=redis://127.0.0.1:6379
 # or use discrete vars instead of REDIS_URL:
 # REDIS_HOST=127.0.0.1
@@ -73,12 +74,11 @@ ESCROW_VAULT_CONTRACT_ID=
 EOF
 ```
 
-## 8) Install + build + DB push
+## 8) Install + build
 
 ```bash
 bun install --frozen-lockfile
 bun run build
-bun run db:push
 ```
 
 ## 9) Start with PM2

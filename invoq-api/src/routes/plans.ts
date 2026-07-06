@@ -27,8 +27,7 @@ import {
   deactivatePlan,
   reactivatePlan,
 } from "../lib/stellar/registry.js";
-import { db, subscriptionCache } from "../lib/db/index.js";
-import { eq } from "drizzle-orm";
+import { listSubscriptionCacheByDeveloperAddress } from "../lib/db/index.js";
 import {
   buildPlanTxXdr,
   buildUpdatePlanTxXdr,
@@ -125,10 +124,7 @@ router.get(
     }
 
     // Annotate with active-subscriber counts from cache
-    const cacheRows = await db
-      .select()
-      .from(subscriptionCache)
-      .where(eq(subscriptionCache.developerAddress, developerAddress));
+    const cacheRows = await listSubscriptionCacheByDeveloperAddress(developerAddress);
 
     const subsByPlan = new Map<number, { active: number; total: number }>();
     for (const r of cacheRows) {

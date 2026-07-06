@@ -1,9 +1,11 @@
 import { Router } from "express";
-import { and, desc, eq } from "drizzle-orm";
 import { asyncHandler } from "../middleware/error.js";
 import { authenticate } from "../middleware/auth.js";
 import { createApiKey, revokeApiKey } from "../lib/auth/api-key.js";
-import { apiKeys, db } from "../lib/db/index.js";
+import {
+  findRevokedApiKey,
+  listApiKeysByDeveloper,
+} from "../lib/db/index.js";
 
 const router = Router();
 
@@ -12,19 +14,7 @@ router.get(
   authenticate(["sk"]),
   asyncHandler(async (_req, res) => {
     const developerId = res.locals.auth.developerId!;
-    const rows = await db
-      .select({
-        id: apiKeys.id,
-        name: apiKeys.name,
-        keyPrefix: apiKeys.keyPrefix,
-        revoked: apiKeys.revoked,
-        createdAt: apiKeys.createdAt,
-        lastUsedAt: apiKeys.lastUsedAt,
-        expiresAt: apiKeys.expiresAt,
-      })
-      .from(apiKeys)
-      .where(eq(apiKeys.developerId, developerId))
-      .orderBy(desc(apiKeys.createdAt));
+    const rows = await listApiKeysByDeveloper(developerId);
 
     res.json(
       rows.map((row) => ({
@@ -127,11 +117,7 @@ router.delete(
 
     await revokeApiKey(keyId, developerId);
 
-    const [row] = await db
-      .select({ id: apiKeys.id })
-      .from(apiKeys)
-      .where(and(eq(apiKeys.id, keyId), eq(apiKeys.developerId, developerId), eq(apiKeys.revoked, true)))
-      .limit(1);
+    const row = await findRevokedApiKey(keyId, developerId);
 
     if (!row) {
       res.status(404).json({ error: "API key not found" });

@@ -15,8 +15,14 @@
  */
 
 import { createHash, randomBytes } from "crypto";
-import { eq, and } from "drizzle-orm";
-import { db, apiKeys, developers, newId, now } from "../db/index.js";
+import {
+  createApiKeyRecord,
+  findApiKeyWithDeveloperByHash,
+  markApiKeyUsed,
+  newId,
+  now,
+  revokeApiKeyRecord,
+} from "../db/index.js";
 import type { Request } from "express";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -86,12 +92,13 @@ export async function createApiKey(params: {
   const { plaintext, hash, prefix } = generateApiKey(params.type, params.env ?? "live");
   const keyId = newId();
 
-  await db.insert(apiKeys).values({
+  await createApiKeyRecord({
     id:          keyId,
     developerId: params.developerId,
     keyHash:     hash,
     keyPrefix:   prefix,
     name:        params.name ?? null,
+    lastUsedAt:  null,
     expiresAt:   params.expiresAt ?? null,
     revoked:     false,
     createdAt:   now(),
@@ -101,10 +108,7 @@ export async function createApiKey(params: {
 }
 
 export async function revokeApiKey(keyId: string, developerId: string): Promise<void> {
-  await db
-    .update(apiKeys)
-    .set({ revoked: true })
-    .where(and(eq(apiKeys.id, keyId), eq(apiKeys.developerId, developerId)));
+  await revokeApiKeyRecord(keyId, developerId);
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
@@ -117,33 +121,14 @@ export async function validateApiKey(plaintext: string): Promise<AuthResult> {
 
   const hash = hashApiKey(plaintext);
 
-  const rows = await db
-    .select({
-      keyId:          apiKeys.id,
-      developerId:    apiKeys.developerId,
-      revoked:        apiKeys.revoked,
-      expiresAt:      apiKeys.expiresAt,
-      stellarAddress: developers.stellarAddress,
-    })
-    .from(apiKeys)
-    .innerJoin(developers, eq(apiKeys.developerId, developers.id))
-    .where(eq(apiKeys.keyHash, hash))
-    .limit(1);
+  const row = await findApiKeyWithDeveloperByHash(hash);
 
-  if (rows.length === 0) return { ...INVALID, error: "Invalid API key" };
-
-  const row = rows[0];
-
-  if (!row)                    return { ...INVALID, error: "Developer has no Stellar address" };
-
-  if (row.revoked)                          return { ...INVALID, error: "API key has been revoked" };
+  if (!row) return { ...INVALID, error: "Invalid API key" };
+  if (row.revoked) return { ...INVALID, error: "API key has been revoked" };
   if (row.expiresAt && row.expiresAt < now()) return { ...INVALID, error: "API key has expired" };
 
   // fire-and-forget last used update
-  db.update(apiKeys)
-    .set({ lastUsedAt: now() })
-    .where(eq(apiKeys.id, row.keyId))
-    .catch(() => {});
+  markApiKeyUsed(row.keyId).catch(() => {});
 
   return {
     valid:            true,

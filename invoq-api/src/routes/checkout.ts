@@ -26,7 +26,10 @@ import {
   verifyInnerTxSigner,
 } from "../lib/stellar/feeBump.js";
 import { getNetworkPassphrase } from "../lib/stellar/client.js";
-import { db, subscriptionCache, newId, now } from "../lib/db/index.js";
+import {
+  now,
+  upsertSubscriptionCache,
+} from "../lib/db/index.js";
 import { invalidateEntitlementCache } from "../lib/cache/redis.js";
 import { getSubscription } from "../lib/stellar/registry.js";
 import { fromUnixSeconds } from "../lib/db/index.js";
@@ -90,30 +93,18 @@ router.post(
     // Sync subscription cache from chain
     const sub = await getSubscription(customerAddress);
     if (sub && developerAddress) {
-      await db
-        .insert(subscriptionCache)
-        .values({
-          customerAddress,
-          planId:             Number(planId),
-          developerId:        res.locals.auth.developerId!,
-          developerAddress,
-          status:             sub.status,
-          currentPeriodStart: fromUnixSeconds(sub.current_period_start),
-          currentPeriodEnd:   fromUnixSeconds(sub.current_period_end),
-          cancelAtPeriodEnd:  sub.cancel_at_period_end,
-          usageCurrent:       Number(sub.usage_current),
-          syncedAt:           now(),
-        })
-        .onConflictDoUpdate({
-          target: subscriptionCache.customerAddress,
-          set: {
-            status:             sub.status,
-            currentPeriodStart: fromUnixSeconds(sub.current_period_start),
-            currentPeriodEnd:   fromUnixSeconds(sub.current_period_end),
-            usageCurrent:       Number(sub.usage_current),
-            syncedAt:           now(),
-          },
-        });
+      await upsertSubscriptionCache({
+        customerAddress,
+        planId:             Number(planId),
+        developerId:        res.locals.auth.developerId!,
+        developerAddress,
+        status:             sub.status,
+        currentPeriodStart: fromUnixSeconds(sub.current_period_start),
+        currentPeriodEnd:   fromUnixSeconds(sub.current_period_end),
+        cancelAtPeriodEnd:  sub.cancel_at_period_end,
+        usageCurrent:       Number(sub.usage_current),
+        syncedAt:           now(),
+      });
     }
 
     // Bust entitlement cache

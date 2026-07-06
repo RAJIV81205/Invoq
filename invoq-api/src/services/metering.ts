@@ -21,9 +21,13 @@ import {
   getUsageThreshold,
 } from "../lib/cache/redis.js";
 import { incrementUsageBatch, getSubscription, checkEntitlementFull } from "../lib/stellar/registry.js";
-import { db, usageBuffer, subscriptionCache, newId, now } from "../lib/db/index.js";
+import {
+  insertUsageBufferBatch,
+  findSubscriptionCacheByCustomer,
+  newId,
+  now,
+} from "../lib/db/index.js";
 import { fireWebhook } from "./webhook.js";
-import { eq } from "drizzle-orm";
 import { createLogger } from "../lib/logger.js";
 
 const log = createLogger("metering");
@@ -77,7 +81,7 @@ export async function flushUsageBuffer(): Promise<{
     }
 
     // Audit trail rows
-    await db.insert(usageBuffer).values(
+    await insertUsageBufferBatch(
       batch.map((e) => ({
         id:              newId(),
         customerAddress: e.customer,
@@ -139,12 +143,7 @@ async function maybeFireUsageThreshold(customer: string): Promise<void> {
   // Mark in cache and fire webhook
   await setUsageThreshold(customer, periodKey, crossed);
 
-  const cacheRows = await db
-    .select()
-    .from(subscriptionCache)
-    .where(eq(subscriptionCache.customerAddress, customer))
-    .limit(1);
-  const row = cacheRows[0];
+  const row = await findSubscriptionCacheByCustomer(customer);
   if (!row || !row.developerId) return;
 
   await fireWebhook({

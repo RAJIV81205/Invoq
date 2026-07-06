@@ -207,7 +207,7 @@ Invoq is structured as four layers, each building on the one below it:
 
   **Layer 2** Subscription Engine    Billing cycle management, plan
                                      enforcement, usage metering, webhook
-                                     event delivery. PostgreSQL + Redis
+                                     event delivery. MongoDB + Redis
                                      for fast state reads. The operational
                                      brain of the platform.
 
@@ -611,10 +611,9 @@ the developer communities Stellar is trying to grow.
                                             renewal processing, webhook
                                             retry, and usage aggregation.
 
-  **Primary database** PostgreSQL           Relational structure is natural
-                                            for customer, subscription, and
-                                            invoice records. ACID
-                                            compliance for billing state.
+  **Primary database** MongoDB             Document structure fits developer,
+                                            webhook, and billing cache state.
+                                            Flexible schema for fast iteration.
 
   **Cache / state**    Redis                Sub-millisecond entitlement
                                             checks for high-frequency API
@@ -687,7 +686,7 @@ tranche)**
 The second milestone builds the operational backend of the platform.
 This includes the Node.js / Fastify REST API with endpoints for plan
 creation, subscription management, entitlement checking, usage
-recording, and customer management. The PostgreSQL database schema and
+recording, and customer management. The MongoDB data model and
 Redis caching layer will be implemented. The BullMQ-based webhook
 delivery system with retry logic will be built. Integration with x402
 for hybrid billing scenarios --- where Invoq entitlement checks gate
@@ -883,7 +882,7 @@ primary cost categories are:
     Soroban contracts before mainnet deployment --- estimated
     \$3,000--\$5,000 of the total budget
 
--   Infrastructure costs: Fly.io hosting, PostgreSQL, Redis, and
+-   Infrastructure costs: Fly.io hosting, MongoDB, Redis, and
     monitoring during development and initial production operations
 
 -   Documentation and developer experience: technical writing,

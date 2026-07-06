@@ -115,7 +115,7 @@ Each contract owns a separate domain and communicates via cross-contract calls.
 |---|---|
 | Smart Contracts | Rust + Soroban SDK |
 | Backend | Node.js |
-| Database | PostgreSQL |
+| Database | MongoDB |
 | Cache Layer | Redis |
 | Queue System | BullMQ |
 | Dashboard | Next.js + TailwindCSS |
@@ -267,7 +267,7 @@ update_threshold()
                │
 ┌──────────────▼──────────────┐
 │     Subscription Engine     │
-│ PostgreSQL + Redis + Jobs   │
+│ MongoDB + Redis + Jobs      │
 └──────────────┬──────────────┘
                │
 ┌──────────────▼──────────────┐
@@ -487,9 +487,8 @@ The deploy script prints the contract addresses. Paste them into `invoq-api/.env
 
 ```bash
 cd invoq-api
-cp .env.example .env       # fill in DATABASE_URL, Redis config, admin key
+cp .env.example .env       # fill in MONGODB_URI, Redis config, admin key
 bun install
-bun run db:push            # apply the schema (adds new payout_address column on first push)
 bun run dev                # http://localhost:3001
 ```
 
@@ -636,7 +635,7 @@ MIT License
 - x402
 - Rust
 - Node.js
-- PostgreSQL
+- MongoDB
 - Redis
 - Next.js
 - TailwindCSS

@@ -8,14 +8,14 @@
  */
 
 import { Router } from "express";
-import { eq, and, desc } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { authenticate } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/error.js";
 import {
-  db,
-  webhookEndpoints,
-  webhookDeliveries,
+  createWebhookEndpoint,
+  deleteWebhookEndpoint,
+  listWebhookDeliveriesByDeveloper,
+  listWebhookEndpointsByDeveloper,
   newId,
   now,
 } from "../lib/db/index.js";
@@ -38,23 +38,15 @@ router.post(
 
     const signingSecret = randomBytes(32).toString("hex");
 
-    const [endpoint] = await db
-      .insert(webhookEndpoints)
-      .values({
-        id:            newId(),
-        developerId:   developerId!,
-        url,
-        signingSecret,
-        events:        events ?? [],
-        active:        true,
-        createdAt:     now(),
-      })
-      .returning();
-
-    if (!endpoint) {
-      res.status(500).json({ error: "Failed to create webhook endpoint" });
-      return;
-    }
+    const endpoint = await createWebhookEndpoint({
+      id:            newId(),
+      developerId:   developerId!,
+      url,
+      signingSecret,
+      events:        events ?? [],
+      active:        true,
+      createdAt:     now(),
+    });
 
     res.status(201).json({
       id:            endpoint.id,
@@ -74,16 +66,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { developerId } = res.locals.auth;
 
-    const endpoints = await db
-      .select({
-        id:        webhookEndpoints.id,
-        url:       webhookEndpoints.url,
-        events:    webhookEndpoints.events,
-        active:    webhookEndpoints.active,
-        createdAt: webhookEndpoints.createdAt,
-      })
-      .from(webhookEndpoints)
-      .where(eq(webhookEndpoints.developerId, developerId!));
+    const endpoints = await listWebhookEndpointsByDeveloper(developerId!);
 
     res.json(endpoints);
   })
@@ -102,14 +85,7 @@ router.delete(
       return;
     }
 
-    await db
-      .delete(webhookEndpoints)
-      .where(
-        and(
-          eq(webhookEndpoints.id, endpointId),
-          eq(webhookEndpoints.developerId, developerId!)
-        )
-      );
+    await deleteWebhookEndpoint(endpointId, developerId!);
 
     res.json({ deleted: true });
   })
@@ -124,21 +100,10 @@ router.get(
     const limit  = Math.min(Number(req.query.limit ?? 50), 200);
     const status = req.query.status as string | undefined;
 
-    const rows = await db
-      .select()
-      .from(webhookDeliveries)
-      .where(
-        and(
-          eq(webhookDeliveries.developerId, developerId!),
-          ...(status
-            ? [eq(webhookDeliveries.status, status as any)]
-            : [])
-        )
-      )
-      .orderBy(desc(webhookDeliveries.createdAt))
-      .limit(limit);
+    const rows = await listWebhookDeliveriesByDeveloper(developerId!);
+    const filtered = status ? rows.filter((row) => row.status === status) : rows;
 
-    res.json(rows);
+    res.json(filtered.slice(0, limit));
   })
 );
 

@@ -26,8 +26,9 @@ import {
   verifyInnerTxSigner,
 } from "../lib/stellar/feeBump.js";
 import { getNetworkPassphrase } from "../lib/stellar/client.js";
-import { db, subscriptionCache } from "../lib/db/index.js";
-import { eq } from "drizzle-orm";
+import {
+  listSubscriptionCustomerAddressesByDeveloperAddress,
+} from "../lib/db/index.js";
 import { createLogger } from "../lib/logger.js";
 import { fireWebhook } from "../services/webhook.js";
 
@@ -359,12 +360,7 @@ router.get(
       return;
     }
 
-    const customers = await db
-      .select({ customerAddress: subscriptionCache.customerAddress })
-      .from(subscriptionCache)
-      .where(eq(subscriptionCache.developerAddress, developerAddress));
-
-    const unique = Array.from(new Set(customers.map((c) => c.customerAddress)));
+    const unique = Array.from(new Set(await listSubscriptionCustomerAddressesByDeveloperAddress(developerAddress)));
 
     const out: any[] = [];
     const CONCURRENCY = 20;

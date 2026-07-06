@@ -4,8 +4,7 @@ import helmet from "helmet";
 import { createLogger } from "./lib/logger.js";
 import { requestLogger, errorHandler } from "./middleware/error.js";
 import { pingRedis } from "./lib/cache/redis.js";
-import { db } from "./lib/db/index.js";
-import { sql } from "drizzle-orm";
+import { pingDatabase } from "./lib/db/index.js";
 
 import plansRouter         from "./routes/plans.js";
 import subscriptionsRouter from "./routes/subscriptions.js";
@@ -81,7 +80,7 @@ export function createApp() {
 
     const [redisOk, dbOk] = await Promise.all([
       pingRedis().catch(() => false),
-      db.execute(sql`SELECT 1`).then(() => true).catch(() => false),
+      pingDatabase().catch(() => false),
     ]);
 
     const status = redisOk && dbOk ? "ok" : "degraded";

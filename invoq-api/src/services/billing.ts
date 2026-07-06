@@ -1,5 +1,10 @@
-import { lt, eq, and } from "drizzle-orm";
-import { db, subscriptionCache, now } from "../lib/db/index.js";
+import {
+  findSubscriptionCacheByCustomer,
+  listDueSubscriptions,
+  listTrialingSubscriptions,
+  now,
+  updateSubscriptionCache,
+} from "../lib/db/index.js";
 import { processRenewals, expireGracePeriods, retryPayment } from "../lib/stellar/billing.js";
 import {
   getGracePeriodCustomers,
@@ -23,10 +28,7 @@ const GRACE_BATCH     = 50;
 export async function runRenewalCycle(): Promise<void> {
   const cycleStart = Date.now();
 
-  const due = await db
-    .select()
-    .from(subscriptionCache)
-    .where(lt(subscriptionCache.currentPeriodEnd, now()));
+  const due = await listDueSubscriptions(now());
 
   if (due.length === 0) {
     log.debug("renewal cycle: no subscriptions due");
@@ -79,16 +81,13 @@ export async function runRenewalCycle(): Promise<void> {
 
       const succeeded = sub.status === "Active";
 
-      await db
-        .update(subscriptionCache)
-        .set({
-          status:             sub.status,
-          currentPeriodStart: fromUnixSeconds(sub.current_period_start),
-          currentPeriodEnd:   fromUnixSeconds(sub.current_period_end),
-          usageCurrent:       Number(sub.usage_current),
-          syncedAt:           now(),
-        })
-        .where(eq(subscriptionCache.customerAddress, row.customerAddress));
+      await updateSubscriptionCache(row.customerAddress, {
+        status:             sub.status,
+        currentPeriodStart: fromUnixSeconds(sub.current_period_start),
+        currentPeriodEnd:   fromUnixSeconds(sub.current_period_end),
+        usageCurrent:       Number(sub.usage_current),
+        syncedAt:           now(),
+      });
 
       await invalidateEntitlementCache(row.customerAddress);
 
@@ -175,23 +174,16 @@ export async function runGraceExpiry(): Promise<void> {
       await clearGracePeriod(customer);
       await invalidateEntitlementCache(customer);
 
-      const cacheRow = await db
-        .select()
-        .from(subscriptionCache)
-        .where(eq(subscriptionCache.customerAddress, customer))
-        .limit(1);
+      const cacheRow = await findSubscriptionCacheByCustomer(customer);
 
-      if (cacheRow.length === 0 || !cacheRow[0]) {
+      if (!cacheRow) {
         log.warn("grace expiry: no cache row found for customer", { customer });
         continue;
       }
 
-      const row = cacheRow[0];
+      const row = cacheRow;
 
-      await db
-        .update(subscriptionCache)
-        .set({ status: "Cancelled", syncedAt: now() })
-        .where(eq(subscriptionCache.customerAddress, customer));
+      await updateSubscriptionCache(customer, { status: "Cancelled", syncedAt: now() });
 
       log.info("grace expiry: subscription cancelled", {
         customer,
@@ -230,10 +222,7 @@ export async function runGraceExpiry(): Promise<void> {
 const TRIAL_WARNING_WINDOW_SECS = 72 * 60 * 60; // 72h
 
 export async function runTrialEnding(): Promise<void> {
-  const rows = await db
-    .select()
-    .from(subscriptionCache)
-    .where(eq(subscriptionCache.status, "Trialing"));
+  const rows = await listTrialingSubscriptions();
 
   if (rows.length === 0) return;
 
@@ -316,24 +305,16 @@ export async function runRetryCycle(): Promise<void> {
       // Refresh cache from chain
       const fresh = await getSubscription(customer);
       if (fresh) {
-        await db
-          .update(subscriptionCache)
-          .set({
-            status:             fresh.status,
-            currentPeriodStart: fromUnixSeconds(fresh.current_period_start),
-            currentPeriodEnd:   fromUnixSeconds(fresh.current_period_end),
-            usageCurrent:       Number(fresh.usage_current),
-            syncedAt:           now(),
-          })
-          .where(eq(subscriptionCache.customerAddress, customer));
+        await updateSubscriptionCache(customer, {
+          status:             fresh.status,
+          currentPeriodStart: fromUnixSeconds(fresh.current_period_start),
+          currentPeriodEnd:   fromUnixSeconds(fresh.current_period_end),
+          usageCurrent:       Number(fresh.usage_current),
+          syncedAt:           now(),
+        });
       }
 
-      const cacheRow = await db
-        .select()
-        .from(subscriptionCache)
-        .where(eq(subscriptionCache.customerAddress, customer))
-        .limit(1);
-      const row = cacheRow[0];
+      const row = await findSubscriptionCacheByCustomer(customer);
       if (row) {
         await fireWebhook({
           developerId: row.developerId,

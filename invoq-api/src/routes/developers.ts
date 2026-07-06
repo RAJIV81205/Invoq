@@ -10,9 +10,16 @@
  */
 
 import { Router } from "express";
-import { eq } from "drizzle-orm";
 import { StrKey } from "@stellar/stellar-sdk";
-import { db, developers, newId, now } from "../lib/db/index.js";
+import {
+  createDeveloper,
+  findDeveloperByEmail,
+  findDeveloperById,
+  findDeveloperByStellarAddress,
+  newId,
+  now,
+  updateDeveloper,
+} from "../lib/db/index.js";
 import { createApiKey } from "../lib/auth/api-key.js";
 import { authenticate } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/error.js";
@@ -62,17 +69,13 @@ router.post(
     }
 
     // Idempotency: a developer is uniquely identified by stellarAddress.
-    const existingByAddress = await db
-      .select()
-      .from(developers)
-      .where(eq(developers.stellarAddress, stellarAddress))
-      .limit(1);
+    const existingByAddress = await findDeveloperByStellarAddress(stellarAddress);
 
     let developerId: string;
     let isNew = false;
 
-    if (existingByAddress.length > 0 && existingByAddress[0]) {
-      const row = existingByAddress[0];
+    if (existingByAddress) {
+      const row = existingByAddress;
       if (row.email !== email) {
         res.status(409).json({
           error: "Stellar address already registered with a different email",
@@ -81,13 +84,8 @@ router.post(
       }
       developerId = row.id;
     } else {
-      const existingByEmail = await db
-        .select()
-        .from(developers)
-        .where(eq(developers.email, email))
-        .limit(1);
-
-      if (existingByEmail.length > 0) {
+      const existingByEmail = await findDeveloperByEmail(email);
+      if (existingByEmail) {
         res.status(409).json({
           error: "Email already registered with a different Stellar address",
         });
@@ -95,11 +93,12 @@ router.post(
       }
 
       developerId = newId();
-      await db.insert(developers).values({
+      await createDeveloper({
         id:             developerId,
         stellarAddress,
         email,
         name:           name.trim(),
+        payoutAddress:  null,
         createdAt:      now(),
         updatedAt:      now(),
       });
@@ -156,18 +155,11 @@ router.post(
       return;
     }
 
-    const rows = await db
-      .select()
-      .from(developers)
-      .where(eq(developers.email, email))
-      .limit(1);
-
-    if (rows.length === 0 || !rows[0]) {
+    const dev = await findDeveloperByEmail(email);
+    if (!dev) {
       res.status(404).json({ error: "No developer found for that email" });
       return;
     }
-
-    const dev = rows[0];
 
     const created = await createApiKey({
       developerId: dev.id,
@@ -204,16 +196,11 @@ router.get(
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
-    const rows = await db
-      .select()
-      .from(developers)
-      .where(eq(developers.id, auth.developerId))
-      .limit(1);
-    if (rows.length === 0 || !rows[0]) {
+    const dev = await findDeveloperById(auth.developerId);
+    if (!dev) {
       res.status(404).json({ error: "Developer not found" });
       return;
     }
-    const dev = rows[0];
     res.json({
       id:             dev.id,
       stellarAddress: dev.stellarAddress,
@@ -238,7 +225,7 @@ router.patch(
       return;
     }
     const { name, payoutAddress } = req.body ?? {};
-    const patch: { name?: string; payoutAddress?: string; updatedAt: Date } = {
+    const patch: { name?: string; payoutAddress?: string | null; updatedAt: Date } = {
       updatedAt: now(),
     };
     if (typeof name === "string") {
@@ -253,16 +240,13 @@ router.patch(
         res.status(400).json({ error: "payoutAddress must be a valid Stellar G... address" });
         return;
       }
-      patch.payoutAddress = payoutAddress ?? undefined;
+      patch.payoutAddress = payoutAddress === null ? null : payoutAddress;
     }
     if (Object.keys(patch).length === 1) {
       res.status(400).json({ error: "No mutable fields supplied" });
       return;
     }
-    await db
-      .update(developers)
-      .set(patch)
-      .where(eq(developers.id, auth.developerId));
+    await updateDeveloper(auth.developerId, patch);
 
     res.json({ ok: true });
   })

@@ -11,13 +11,15 @@
  */
 
 import { createHmac } from "crypto";
-import { eq } from "drizzle-orm";
 import { Queue } from "bullmq";
-import { db, webhookEndpoints, webhookDeliveries, newId, now } from "../lib/db/index.js";
+import {
+  createWebhookDelivery,
+  findWebhookEndpointsForDeveloper,
+  newId,
+  now,
+} from "../lib/db/index.js";
 import { getRedisConnectionConfig } from "../lib/cache/redis.js";
-import type { webhookEventEnum } from "../lib/db/schema.js";
-
-type WebhookEvent = typeof webhookEventEnum.enumValues[number];
+import type { WebhookEvent } from "../lib/db/schema.js";
 
 // BullMQ queue
 const webhookQueue = new Queue("webhook-delivery", {
@@ -32,10 +34,7 @@ export async function fireWebhook(params: {
   const { developerId, event, payload } = params;
 
   // Find all active endpoints for this developer that listen to this event
-  const endpoints = await db
-    .select()
-    .from(webhookEndpoints)
-    .where(eq(webhookEndpoints.developerId, developerId));
+  const endpoints = await findWebhookEndpointsForDeveloper(developerId);
 
   const active = endpoints.filter(
     (ep) =>
@@ -57,14 +56,18 @@ export async function fireWebhook(params: {
     // HMAC signature — developer verifies this
     const sig = signPayload(fullPayload, endpoint.signingSecret);
 
-    await db.insert(webhookDeliveries).values({
+    await createWebhookDelivery({
       id:           deliveryId,
       endpointId:   endpoint.id,
       developerId,
       event,
       payload:      fullPayload,
       status:       "pending",
+      httpStatus:   null,
+      responseBody: null,
       attemptCount: 0,
+      nextRetryAt:  null,
+      deliveredAt:  null,
       createdAt:    now(),
     });
 
