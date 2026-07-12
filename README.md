@@ -4,6 +4,8 @@
 
 Invoq is a production-ready subscription billing platform built on Soroban smart contracts and Stellar USDC.
 
+For a practical setup and usage walkthrough, see [HOW_TO_USE.md](./HOW_TO_USE.md).
+
 It enables developers, SaaS platforms, AI APIs, and agentic applications to implement:
 
 - Recurring billing
@@ -491,6 +493,8 @@ cp .env.example .env       # fill in MONGODB_URI, Redis config, admin key
 bun install
 bun run dev                # http://localhost:3001
 ```
+
+Redis should be available locally on `127.0.0.1:6379` for cache, queues, and jobs.
 
 In another terminal, smoke-test it:
 

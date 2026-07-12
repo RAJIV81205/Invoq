@@ -11,8 +11,9 @@ ssh root@YOUR_VPS_IP
 ```bash
 apt update -y
 apt upgrade -y
-apt install -y git curl nginx certbot python3-certbot-nginx nodejs npm
+apt install -y git curl nginx redis-server certbot python3-certbot-nginx nodejs npm
 npm install -g pm2
+systemctl enable --now redis-server
 ```
 
 ## 3) Install Bun
@@ -63,7 +64,7 @@ STELLAR_ADMIN_SECRET=
 MONGODB_URI=
 MONGODB_DB=invoq
 REDIS_URL=redis://127.0.0.1:6379
-# or use discrete vars instead of REDIS_URL:
+# or use local host/port directly:
 # REDIS_HOST=127.0.0.1
 # REDIS_PORT=6379
 # REDIS_PASSWORD=
