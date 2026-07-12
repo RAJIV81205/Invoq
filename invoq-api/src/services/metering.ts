@@ -98,7 +98,7 @@ export async function flushUsageBuffer(): Promise<{
   }
 
   // ── Threshold webhooks (best-effort, sequential per customer) ───────────
-  let thresholdEvents = 0;
+  const thresholdEvents = 0;
   if (affectedCustomers.size > 0) {
     for (const customer of affectedCustomers) {
       try {

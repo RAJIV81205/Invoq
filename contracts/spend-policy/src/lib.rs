@@ -50,16 +50,15 @@
 //! - `get_daily_limit_remaining` — public, read-only
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, contractevent,
+    contract, contracterror, contractevent, contractimpl, contracttype, log, panic_with_error,
     Address, Env, Vec,
-    panic_with_error, log,
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LEDGERS_PER_YEAR: u32     = 6_307_200;
+const LEDGERS_PER_YEAR: u32 = 6_307_200;
 const PERSISTENT_TTL_THRESHOLD: u32 = LEDGERS_PER_YEAR;
-const PERSISTENT_TTL_BUMP:      u32 = LEDGERS_PER_YEAR;
+const PERSISTENT_TTL_BUMP: u32 = LEDGERS_PER_YEAR;
 
 /// Maximum agents per policy
 const MAX_AGENTS: u32 = 100;
@@ -77,19 +76,19 @@ const DAILY_SPEND_TTL: u32 = 518_400;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum Error {
-    AlreadyInitialized   = 1,
-    NotInitialized       = 2,
+    AlreadyInitialized = 1,
+    NotInitialized = 2,
 
-    Unauthorized         = 10,
+    Unauthorized = 10,
 
-    PolicyAlreadyExists  = 20,
-    PolicyNotFound       = 21,
-    AlreadyInactive      = 22,
-    AlreadyActive        = 23,
-    TooManyAgents        = 24,
-    TooManyAllowlist     = 25,
+    PolicyAlreadyExists = 20,
+    PolicyNotFound = 21,
+    AlreadyInactive = 22,
+    AlreadyActive = 23,
+    TooManyAgents = 24,
+    TooManyAllowlist = 25,
 
-    InvalidAmount        = 30,
+    InvalidAmount = 30,
 }
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
@@ -162,7 +161,10 @@ pub enum SpendCheckResult {
 
 impl SpendCheckResult {
     pub fn is_allowed(&self) -> bool {
-        matches!(self, SpendCheckResult::Allowed | SpendCheckResult::NoPolicyFound)
+        matches!(
+            self,
+            SpendCheckResult::Allowed | SpendCheckResult::NoPolicyFound
+        )
     }
 }
 
@@ -170,39 +172,46 @@ impl SpendCheckResult {
 
 #[contractevent]
 pub struct PolicyCreated {
-    #[topic] pub owner: Address,
+    #[topic]
+    pub owner: Address,
     pub agent_count: u32,
 }
 
 #[contractevent]
 pub struct PolicyUpdated {
-    #[topic] pub owner: Address,
+    #[topic]
+    pub owner: Address,
 }
 
 #[contractevent]
 pub struct PolicyDeactivated {
-    #[topic] pub owner: Address,
+    #[topic]
+    pub owner: Address,
 }
 
 #[contractevent]
 pub struct PolicyReactivated {
-    #[topic] pub owner: Address,
+    #[topic]
+    pub owner: Address,
 }
 
 #[contractevent]
 pub struct SpendRecorded {
-    #[topic] pub agent:       Address,
-    #[topic] pub owner:       Address,
-    pub amount_usdc:  i128,
-    pub daily_total:  i128,
-    pub day_number:   u64,
+    #[topic]
+    pub agent: Address,
+    #[topic]
+    pub owner: Address,
+    pub amount_usdc: i128,
+    pub daily_total: i128,
+    pub day_number: u64,
 }
 
 #[contractevent]
 pub struct SpendBlocked {
-    #[topic] pub agent:       Address,
-    pub reason:       SpendCheckResult,
-    pub amount_usdc:  i128,
+    #[topic]
+    pub agent: Address,
+    pub reason: SpendCheckResult,
+    pub amount_usdc: i128,
 }
 
 // ─── Auth Helpers ─────────────────────────────────────────────────────────────
@@ -270,10 +279,7 @@ fn store_policy(env: &Env, policy: &SpendPolicyConfig) {
 /// Returns the policy owner for an agent address, if one is registered.
 fn agent_owner(env: &Env, agent: &Address) -> Option<Address> {
     let key = DataKey::AgentOwner(agent.clone());
-    let result = env
-        .storage()
-        .persistent()
-        .get::<DataKey, Address>(&key);
+    let result = env.storage().persistent().get::<DataKey, Address>(&key);
     if result.is_some() {
         env.storage()
             .persistent()
@@ -336,7 +342,6 @@ pub struct SpendPolicy;
 
 #[contractimpl]
 impl SpendPolicy {
-
     // ═════════════════════════════════════════════════════════════════════════
     // INITIALISATION
     // ═════════════════════════════════════════════════════════════════════════
@@ -398,7 +403,11 @@ impl SpendPolicy {
     ) {
         owner.require_auth();
 
-        if env.storage().persistent().has(&DataKey::Policy(owner.clone())) {
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::Policy(owner.clone()))
+        {
             panic_with_error!(&env, Error::PolicyAlreadyExists);
         }
         if daily_limit_usdc < 0 || tx_limit_usdc < 0 {
@@ -421,22 +430,18 @@ impl SpendPolicy {
         }
 
         let policy = SpendPolicyConfig {
-            owner:            owner.clone(),
+            owner: owner.clone(),
             daily_limit_usdc,
             tx_limit_usdc,
             allowlist,
             agents,
-            active:           true,
-            created_at:       now,
+            active: true,
+            created_at: now,
         };
 
         store_policy(&env, &policy);
 
-        PolicyCreated {
-            owner,
-            agent_count,
-        }
-        .publish(&env);
+        PolicyCreated { owner, agent_count }.publish(&env);
     }
 
     /// Updates an existing policy.
@@ -492,9 +497,9 @@ impl SpendPolicy {
         }
 
         policy.daily_limit_usdc = daily_limit_usdc;
-        policy.tx_limit_usdc    = tx_limit_usdc;
-        policy.allowlist        = allowlist;
-        policy.agents           = agents;
+        policy.tx_limit_usdc = tx_limit_usdc;
+        policy.allowlist = allowlist;
+        policy.agents = agents;
 
         store_policy(&env, &policy);
 
@@ -578,12 +583,12 @@ impl SpendPolicy {
         // Fast path: no policy registered for this agent
         let owner = match agent_owner(&env, &agent) {
             Some(o) => o,
-            None    => return SpendCheckResult::NoPolicyFound,
+            None => return SpendCheckResult::NoPolicyFound,
         };
 
         let policy = match try_load_policy(&env, &owner) {
             Some(p) => p,
-            None    => return SpendCheckResult::NoPolicyFound,
+            None => return SpendCheckResult::NoPolicyFound,
         };
 
         // Inactive policy — all payments permitted
@@ -654,12 +659,7 @@ impl SpendPolicy {
     /// * `InvalidAmount`  — amount is 0 or negative.
     /// * `PolicyNotFound` — no policy registered for this agent (still records;
     ///                      this is a no-op if owner lookup fails).
-    pub fn record_spend(
-        env: Env,
-        caller: Address,
-        agent: Address,
-        amount_usdc: i128,
-    ) -> i128 {
+    pub fn record_spend(env: Env, caller: Address, agent: Address, amount_usdc: i128) -> i128 {
         require_admin(&env, &caller);
 
         if amount_usdc <= 0 {
@@ -669,10 +669,10 @@ impl SpendPolicy {
         // Look up the owner for this agent
         let owner = match agent_owner(&env, &agent) {
             Some(o) => o,
-            None    => return 0i128, // No policy — no-op, return 0
+            None => return 0i128, // No policy — no-op, return 0
         };
 
-        let today     = day_number(env.ledger().timestamp());
+        let today = day_number(env.ledger().timestamp());
         let new_total = add_daily_spent(&env, &owner, today, amount_usdc);
 
         SpendRecorded {
@@ -680,7 +680,7 @@ impl SpendPolicy {
             owner,
             amount_usdc,
             daily_total: new_total,
-            day_number:  today,
+            day_number: today,
         }
         .publish(&env);
 
@@ -718,14 +718,14 @@ impl SpendPolicy {
     pub fn get_daily_limit_remaining(env: Env, owner: Address, timestamp: u64) -> i128 {
         let policy = match try_load_policy(&env, &owner) {
             Some(p) => p,
-            None    => return i128::MAX,
+            None => return i128::MAX,
         };
 
         if policy.daily_limit_usdc == 0 {
             return i128::MAX; // Unlimited
         }
 
-        let day   = day_number(timestamp);
+        let day = day_number(timestamp);
         let spent = load_daily_spent(&env, &owner, day);
         let remaining = policy.daily_limit_usdc.saturating_sub(spent);
         remaining.max(0)
@@ -737,20 +737,20 @@ impl SpendPolicy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, vec, Env};
+    use soroban_sdk::{testutils::Address as _, Env};
 
     struct TestCtx {
-        env:    Env,
+        env: Env,
         client: SpendPolicyClient<'static>,
-        admin:  Address,
+        admin: Address,
     }
 
     fn setup() -> TestCtx {
-        let env    = Env::default();
+        let env = Env::default();
         env.mock_all_auths();
-        let contract_id = env.register_contract(None, SpendPolicy);
+        let contract_id = env.register(SpendPolicy, ());
         let client = SpendPolicyClient::new(&env, &contract_id);
-        let admin  = Address::generate(&env);
+        let admin = Address::generate(&env);
         client.initialize(&admin);
         TestCtx { env, client, admin }
     }
@@ -789,58 +789,64 @@ mod tests {
 
     #[test]
     fn test_create_policy_basic() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let agent = Address::generate(&ctx.env);
 
-        let agents    = make_allowlist(&ctx.env, &[agent.clone()]);
+        let agents = make_allowlist(&ctx.env, &[agent.clone()]);
         let allowlist = soroban_sdk::vec![&ctx.env];
 
         ctx.client.create_policy(
             &owner,
-            &100_000_000i128,  // 10 USDC/day
-            &10_000_000i128,   // 1 USDC/tx
+            &100_000_000i128, // 10 USDC/day
+            &10_000_000i128,  // 1 USDC/tx
             &allowlist,
             &agents,
         );
 
         let policy = ctx.client.get_policy(&owner).unwrap();
-        assert_eq!(policy.owner,            owner);
+        assert_eq!(policy.owner, owner);
         assert_eq!(policy.daily_limit_usdc, 100_000_000i128);
-        assert_eq!(policy.tx_limit_usdc,    10_000_000i128);
+        assert_eq!(policy.tx_limit_usdc, 10_000_000i128);
         assert!(policy.active);
         assert_eq!(ctx.client.get_agent_owner(&agent), Some(owner));
     }
 
     #[test]
     fn test_duplicate_policy_rejected() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let empty = soroban_sdk::vec![&ctx.env];
 
-        ctx.client.create_policy(&owner, &0i128, &0i128, &empty, &empty);
-        assert!(ctx.client.try_create_policy(&owner, &0i128, &0i128, &empty, &empty).is_err());
+        ctx.client
+            .create_policy(&owner, &0i128, &0i128, &empty, &empty);
+        assert!(ctx
+            .client
+            .try_create_policy(&owner, &0i128, &0i128, &empty, &empty)
+            .is_err());
     }
 
     #[test]
     fn test_too_many_agents_rejected() {
-        let ctx    = setup();
-        let owner  = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let agents = make_agents(&ctx.env, 101); // over MAX_AGENTS of 100
-        let empty  = soroban_sdk::vec![&ctx.env];
+        let empty = soroban_sdk::vec![&ctx.env];
 
-        assert!(ctx.client
+        assert!(ctx
+            .client
             .try_create_policy(&owner, &0i128, &0i128, &empty, &agents)
             .is_err());
     }
 
     #[test]
     fn test_negative_limit_rejected() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let empty = soroban_sdk::vec![&ctx.env];
 
-        assert!(ctx.client
+        assert!(ctx
+            .client
             .try_create_policy(&owner, &-1i128, &0i128, &empty, &empty)
             .is_err());
     }
@@ -849,9 +855,9 @@ mod tests {
 
     #[test]
     fn test_no_policy_returns_no_policy_found() {
-        let ctx   = setup();
+        let ctx = setup();
         let agent = Address::generate(&ctx.env);
-        let dest  = Address::generate(&ctx.env);
+        let dest = Address::generate(&ctx.env);
 
         let result = ctx.client.check_spend(&agent, &dest, &1_000_000i128);
         assert!(result.is_allowed());
@@ -860,12 +866,12 @@ mod tests {
 
     #[test]
     fn test_check_spend_allowed_within_limits() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let agent = Address::generate(&ctx.env);
-        let dest  = Address::generate(&ctx.env);
+        let dest = Address::generate(&ctx.env);
 
-        let agents    = make_allowlist(&ctx.env, &[agent.clone()]);
+        let agents = make_allowlist(&ctx.env, &[agent.clone()]);
         let allowlist = make_allowlist(&ctx.env, &[dest.clone()]);
 
         ctx.client.create_policy(
@@ -882,16 +888,17 @@ mod tests {
 
     #[test]
     fn test_check_spend_blocked_by_allowlist() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let agent = Address::generate(&ctx.env);
-        let dest  = Address::generate(&ctx.env);
+        let dest = Address::generate(&ctx.env);
         let other = Address::generate(&ctx.env); // not in allowlist
 
-        let agents    = make_allowlist(&ctx.env, &[agent.clone()]);
+        let agents = make_allowlist(&ctx.env, &[agent.clone()]);
         let allowlist = make_allowlist(&ctx.env, &[dest.clone()]);
 
-        ctx.client.create_policy(&owner, &0i128, &0i128, &allowlist, &agents);
+        ctx.client
+            .create_policy(&owner, &0i128, &0i128, &allowlist, &agents);
 
         let result = ctx.client.check_spend(&agent, &other, &1_000_000i128);
         assert!(!result.is_allowed());
@@ -900,18 +907,18 @@ mod tests {
 
     #[test]
     fn test_check_spend_blocked_by_tx_limit() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let agent = Address::generate(&ctx.env);
-        let dest  = Address::generate(&ctx.env);
+        let dest = Address::generate(&ctx.env);
 
-        let agents    = make_allowlist(&ctx.env, &[agent.clone()]);
+        let agents = make_allowlist(&ctx.env, &[agent.clone()]);
         let allowlist = soroban_sdk::vec![&ctx.env]; // no allowlist
 
         ctx.client.create_policy(
             &owner,
-            &0i128,          // no daily limit
-            &5_000_000i128,  // 0.5 USDC/tx max
+            &0i128,         // no daily limit
+            &5_000_000i128, // 0.5 USDC/tx max
             &allowlist,
             &agents,
         );
@@ -923,12 +930,12 @@ mod tests {
 
     #[test]
     fn test_check_spend_blocked_by_daily_limit() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let agent = Address::generate(&ctx.env);
-        let dest  = Address::generate(&ctx.env);
+        let dest = Address::generate(&ctx.env);
 
-        let agents    = make_allowlist(&ctx.env, &[agent.clone()]);
+        let agents = make_allowlist(&ctx.env, &[agent.clone()]);
         let allowlist = soroban_sdk::vec![&ctx.env];
 
         ctx.client.create_policy(
@@ -950,16 +957,17 @@ mod tests {
 
     #[test]
     fn test_inactive_policy_allows_all_payments() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let agent = Address::generate(&ctx.env);
-        let dest  = Address::generate(&ctx.env);
+        let dest = Address::generate(&ctx.env);
         let other = Address::generate(&ctx.env);
 
-        let agents    = make_allowlist(&ctx.env, &[agent.clone()]);
+        let agents = make_allowlist(&ctx.env, &[agent.clone()]);
         let allowlist = make_allowlist(&ctx.env, &[dest.clone()]);
 
-        ctx.client.create_policy(&owner, &1_000i128, &1_000i128, &allowlist, &agents);
+        ctx.client
+            .create_policy(&owner, &1_000i128, &1_000i128, &allowlist, &agents);
         ctx.client.deactivate_policy(&owner);
 
         // Would normally be blocked by allowlist and daily limit — but policy is inactive
@@ -971,13 +979,14 @@ mod tests {
 
     #[test]
     fn test_record_spend_accumulates_daily() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let agent = Address::generate(&ctx.env);
 
         let agents = make_allowlist(&ctx.env, &[agent.clone()]);
-        let empty  = soroban_sdk::vec![&ctx.env];
-        ctx.client.create_policy(&owner, &0i128, &0i128, &empty, &agents);
+        let empty = soroban_sdk::vec![&ctx.env];
+        ctx.client
+            .create_policy(&owner, &0i128, &0i128, &empty, &agents);
 
         let now = ctx.env.ledger().timestamp();
 
@@ -992,14 +1001,17 @@ mod tests {
 
     #[test]
     fn test_record_spend_zero_rejected() {
-        let ctx   = setup();
+        let ctx = setup();
         let agent = Address::generate(&ctx.env);
-        assert!(ctx.client.try_record_spend(&ctx.admin, &agent, &0i128).is_err());
+        assert!(ctx
+            .client
+            .try_record_spend(&ctx.admin, &agent, &0i128)
+            .is_err());
     }
 
     #[test]
     fn test_record_spend_unknown_agent_returns_zero() {
-        let ctx   = setup();
+        let ctx = setup();
         let agent = Address::generate(&ctx.env); // no policy
         let total = ctx.client.record_spend(&ctx.admin, &agent, &1_000_000i128);
         assert_eq!(total, 0i128); // no-op
@@ -1009,16 +1021,18 @@ mod tests {
 
     #[test]
     fn test_daily_limit_remaining_decreases() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let agent = Address::generate(&ctx.env);
 
         let agents = make_allowlist(&ctx.env, &[agent.clone()]);
-        let empty  = soroban_sdk::vec![&ctx.env];
+        let empty = soroban_sdk::vec![&ctx.env];
         ctx.client.create_policy(
             &owner,
             &100_000_000i128, // 10 USDC/day
-            &0i128, &empty, &agents,
+            &0i128,
+            &empty,
+            &agents,
         );
 
         let now = ctx.env.ledger().timestamp();
@@ -1034,10 +1048,11 @@ mod tests {
 
     #[test]
     fn test_daily_limit_remaining_unlimited_returns_max() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let empty = soroban_sdk::vec![&ctx.env];
-        ctx.client.create_policy(&owner, &0i128, &0i128, &empty, &empty);
+        ctx.client
+            .create_policy(&owner, &0i128, &0i128, &empty, &empty);
 
         let remaining = ctx.client.get_daily_limit_remaining(&owner, &0u64);
         assert_eq!(remaining, i128::MAX);
@@ -1047,14 +1062,15 @@ mod tests {
 
     #[test]
     fn test_update_policy_changes_limits() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let agent = Address::generate(&ctx.env);
 
         let agents = make_allowlist(&ctx.env, &[agent.clone()]);
-        let empty  = soroban_sdk::vec![&ctx.env];
+        let empty = soroban_sdk::vec![&ctx.env];
 
-        ctx.client.create_policy(&owner, &100_000_000i128, &10_000_000i128, &empty, &agents);
+        ctx.client
+            .create_policy(&owner, &100_000_000i128, &10_000_000i128, &empty, &agents);
         ctx.client.update_policy(
             &owner,
             &200_000_000i128, // doubled daily limit
@@ -1065,19 +1081,20 @@ mod tests {
 
         let policy = ctx.client.get_policy(&owner).unwrap();
         assert_eq!(policy.daily_limit_usdc, 200_000_000i128);
-        assert_eq!(policy.tx_limit_usdc,    5_000_000i128);
+        assert_eq!(policy.tx_limit_usdc, 5_000_000i128);
     }
 
     #[test]
     fn test_update_policy_deregisters_removed_agents() {
-        let ctx    = setup();
-        let owner  = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let agent1 = Address::generate(&ctx.env);
         let agent2 = Address::generate(&ctx.env);
-        let empty  = soroban_sdk::vec![&ctx.env];
+        let empty = soroban_sdk::vec![&ctx.env];
 
         let agents_both = make_allowlist(&ctx.env, &[agent1.clone(), agent2.clone()]);
-        ctx.client.create_policy(&owner, &0i128, &0i128, &empty, &agents_both);
+        ctx.client
+            .create_policy(&owner, &0i128, &0i128, &empty, &agents_both);
 
         // Verify both registered
         assert_eq!(ctx.client.get_agent_owner(&agent1), Some(owner.clone()));
@@ -1085,7 +1102,8 @@ mod tests {
 
         // Update: remove agent2
         let agents_one = make_allowlist(&ctx.env, &[agent1.clone()]);
-        ctx.client.update_policy(&owner, &0i128, &0i128, &empty, &agents_one);
+        ctx.client
+            .update_policy(&owner, &0i128, &0i128, &empty, &agents_one);
 
         assert_eq!(ctx.client.get_agent_owner(&agent1), Some(owner.clone()));
         assert_eq!(ctx.client.get_agent_owner(&agent2), None); // deregistered
@@ -1095,11 +1113,12 @@ mod tests {
 
     #[test]
     fn test_deactivate_reactivate_cycle() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let empty = soroban_sdk::vec![&ctx.env];
 
-        ctx.client.create_policy(&owner, &0i128, &0i128, &empty, &empty);
+        ctx.client
+            .create_policy(&owner, &0i128, &0i128, &empty, &empty);
         assert!(ctx.client.get_policy(&owner).unwrap().active);
 
         ctx.client.deactivate_policy(&owner);
@@ -1111,10 +1130,11 @@ mod tests {
 
     #[test]
     fn test_double_deactivate_rejected() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let empty = soroban_sdk::vec![&ctx.env];
-        ctx.client.create_policy(&owner, &0i128, &0i128, &empty, &empty);
+        ctx.client
+            .create_policy(&owner, &0i128, &0i128, &empty, &empty);
         ctx.client.deactivate_policy(&owner);
         assert!(ctx.client.try_deactivate_policy(&owner).is_err());
     }
@@ -1123,14 +1143,15 @@ mod tests {
 
     #[test]
     fn test_is_spend_allowed_wrapper() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
         let agent = Address::generate(&ctx.env);
-        let dest  = Address::generate(&ctx.env);
+        let dest = Address::generate(&ctx.env);
 
         let agents = make_allowlist(&ctx.env, &[agent.clone()]);
-        let empty  = soroban_sdk::vec![&ctx.env];
-        ctx.client.create_policy(&owner, &10_000_000i128, &0i128, &empty, &agents);
+        let empty = soroban_sdk::vec![&ctx.env];
+        ctx.client
+            .create_policy(&owner, &10_000_000i128, &0i128, &empty, &agents);
 
         assert!(ctx.client.is_spend_allowed(&agent, &dest, &5_000_000i128));
 

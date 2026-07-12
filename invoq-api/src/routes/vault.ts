@@ -29,10 +29,7 @@ import { getNetworkPassphrase } from "../lib/stellar/client.js";
 import {
   listSubscriptionCustomerAddressesByDeveloperAddress,
 } from "../lib/db/index.js";
-import { createLogger } from "../lib/logger.js";
 import { fireWebhook } from "../services/webhook.js";
-
-const log = createLogger("vault");
 
 const router = Router();
 
@@ -362,7 +359,16 @@ router.get(
 
     const unique = Array.from(new Set(await listSubscriptionCustomerAddressesByDeveloperAddress(developerAddress)));
 
-    const out: any[] = [];
+    const out: Array<{
+      customer: string;
+      developer: string;
+      balance_usdc: string;
+      total_deposited: string;
+      total_debited: string;
+      low_balance_threshold: string;
+      auto_topup_amount: string;
+      created_at: string;
+    }> = [];
     const CONCURRENCY = 20;
     for (let i = 0; i < unique.length; i += CONCURRENCY) {
       const slice = unique.slice(i, i + CONCURRENCY);

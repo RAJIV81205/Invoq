@@ -3,6 +3,7 @@ import StatusPill from "@/app/components/StatusPill";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import DeactivateButton from "./DeactivateButton";
+import type { DashboardPlan } from "@/app/lib/types";
 
 const STROOPS_PER_USDC = 10_000_000;
 
@@ -23,7 +24,7 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ pla
     if (res.status === 404) notFound();
     return <div className="rounded-[1.5rem] border border-[var(--danger)]/20 bg-[var(--danger)]/10 p-5 text-sm text-rose-200">Failed to load plan: {res.status}</div>;
   }
-  const plan = await res.json();
+  const plan: DashboardPlan = await res.json();
 
   return (
     <div className="space-y-6">
@@ -38,7 +39,7 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ pla
           </div>
           <div className="flex items-center gap-3">
             <StatusPill status={plan.active ? "Active" : "Cancelled"} />
-            <DeactivateButton planId={plan.plan_id} active={plan.active} />
+            <DeactivateButton planId={String(plan.plan_id)} active={plan.active} />
           </div>
         </div>
       </div>
@@ -66,9 +67,9 @@ export default async function PlanDetailPage({ params }: { params: Promise<{ pla
 
       <div className="surface rounded-[1.5rem] p-5">
         <h2 className="mb-3 text-lg font-semibold tracking-[-0.03em]">Features</h2>
-        {plan.features?.length > 0 ? (
+        {(plan.features?.length ?? 0) > 0 ? (
           <div className="flex flex-wrap gap-2">
-            {plan.features.map((f: string) => (
+            {(plan.features ?? []).map((f: string) => (
               <span key={f} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-mono">
                 {f}
               </span>

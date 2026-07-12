@@ -2,6 +2,7 @@ import { requireSession, apiFetch } from "@/app/lib/auth-cookie";
 import StatusPill from "@/app/components/StatusPill";
 import EmptyState from "@/app/components/EmptyState";
 import NewEndpointButton from "./NewEndpointButton";
+import type { WebhookDelivery, WebhookEndpoint } from "@/app/lib/types";
 
 export default async function WebhooksPage() {
   const session = await requireSession();
@@ -9,8 +10,8 @@ export default async function WebhooksPage() {
     apiFetch(session, "/v1/webhooks"),
     apiFetch(session, "/v1/webhooks/log?limit=200"),
   ]);
-  const endpoints: any[] = endpointsRes.ok ? await endpointsRes.json() : [];
-  const log: any[] = logRes.ok ? await logRes.json() : [];
+  const endpoints: WebhookEndpoint[] = endpointsRes.ok ? await endpointsRes.json() : [];
+  const log: WebhookDelivery[] = logRes.ok ? await logRes.json() : [];
 
   return (
     <div className="space-y-8">
@@ -51,7 +52,7 @@ export default async function WebhooksPage() {
                   <tr key={e.id}>
                     <td className="px-5 py-3 font-mono text-xs">{e.url}</td>
                     <td className="px-5 py-3 text-[var(--muted)]">
-                      {e.events?.length > 0 ? e.events.join(", ") : "all"}
+                      {(e.events?.length ?? 0) > 0 ? e.events?.join(", ") : "all"}
                     </td>
                     <td className="px-5 py-3">
                       <StatusPill status={e.active ? "Active" : "Cancelled"} />

@@ -3,6 +3,7 @@ import StatusPill from "@/app/components/StatusPill";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CustomerActions from "./CustomerActions";
+import type { OnChainSubscription, WebhookDelivery } from "@/app/lib/types";
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ customerAddress: string }> }) {
   const { customerAddress } = await params;
@@ -14,8 +15,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   ]);
 
   if (subRes.status === 404) notFound();
-  const sub = subRes.ok ? await subRes.json() : null;
-  const hist = histRes.ok ? await histRes.json() : { events: [], transactions: [] };
+  const sub: OnChainSubscription | null = subRes.ok ? await subRes.json() : null;
+  const hist: { events: WebhookDelivery[]; transactions: unknown[] } =
+    histRes.ok ? await histRes.json() : { events: [], transactions: [] };
 
   return (
     <div className="space-y-6">
@@ -63,7 +65,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         </div>
         {hist.events?.length > 0 ? (
           <div className="divide-y divide-white/10">
-            {hist.events.map((e: any) => (
+            {hist.events.map((e) => (
               <div key={e.id} className="px-5 py-3 flex items-center gap-3 text-sm">
                 <StatusPill status={e.status} />
                 <span className="font-mono text-xs text-[var(--muted)] flex-1 truncate">{e.event}</span>

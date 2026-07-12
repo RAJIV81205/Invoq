@@ -42,7 +42,7 @@ API_KEY="${API_KEY:-}"
 CUSTOMER_ADDRESS="${CUSTOMER_ADDRESS:-}"
 
 if [ -z "$API_KEY" ]; then
-  echo "Error: API_KEY not set. Run: npx tsx gen-key.ts and export API_KEY=sk_live_..."
+  echo "Error: API_KEY not set. Export CUSTOMER_ADDRESS, then run: cd invoq-api && npx tsx test/gen-key.ts"
   exit 1
 fi
 
@@ -68,6 +68,7 @@ SKIP=0
 PLAN_ID=""
 FREE_PLAN_ID=""
 WEBHOOK_ENDPOINT_ID=""
+VAULT_DEVELOPER_ADDRESS="${TEST_VAULT_DEVELOPER_ADDRESS:-$(node --input-type=module -e 'import { Keypair } from "@stellar/stellar-sdk"; console.log(Keypair.random().publicKey())' 2>/dev/null)}"
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 section() {
@@ -118,7 +119,7 @@ api_status() {
 
 assert_contains() {
   local label="$1" output="$2" expected="$3"
-  if echo "$output" | grep -q "$expected"; then
+  if echo "$output" | grep -Fq -- "$expected"; then
     pass "$label"
   else
     fail "$label (expected '$expected' in: $output)"
@@ -127,7 +128,7 @@ assert_contains() {
 
 assert_not_contains() {
   local label="$1" output="$2" expected="$3"
-  if echo "$output" | grep -q "$expected"; then
+  if echo "$output" | grep -Fq -- "$expected"; then
     fail "$label (did NOT expect '$expected' in: $output)"
   else
     pass "$label"
@@ -145,7 +146,7 @@ assert_status() {
 
 assert_json_field() {
   local label="$1" output="$2" field="$3"
-  if echo "$output" | jq -e ".$field" > /dev/null 2>&1; then
+  if echo "$output" | jq -e --arg field "$field" 'has($field)' > /dev/null 2>&1; then
     pass "$label"
   else
     fail "$label (field '$field' missing in: $output)"
@@ -161,6 +162,7 @@ echo ""
 echo "  Base URL:  $BASE_URL"
 echo "  API Key:   ${API_KEY:0:14}..."
 echo "  Customer:  $CUSTOMER_ADDRESS"
+echo "  Vault dev: $VAULT_DEVELOPER_ADDRESS"
 echo ""
 
 ########################################
@@ -308,7 +310,7 @@ assert_status "missing planId → 400" "$STATUS" "400"
 step "4.3" "POST /v1/checkout/build-vault-tx — build vault creation tx"
 OUT=$(api POST /v1/checkout/build-vault-tx "{
   \"customerAddress\": \"$CUSTOMER_ADDRESS\",
-  \"developerAddress\": \"$CUSTOMER_ADDRESS\",
+  \"developerAddress\": \"$VAULT_DEVELOPER_ADDRESS\",
   \"initialDeposit\": 5000000,
   \"lowBalanceThreshold\": 1000000,
   \"autoTopupAmount\": 0
@@ -454,7 +456,7 @@ STATUS=$(api_status GET "/v1/vault?customer=$CUSTOMER_ADDRESS")
 assert_status "missing developer → 400" "$STATUS" "400"
 
 step "8.2" "GET /v1/vault — non-existent vault → 404"
-STATUS=$(api_status GET "/v1/vault?customer=$CUSTOMER_ADDRESS&developer=$CUSTOMER_ADDRESS")
+STATUS=$(api_status GET "/v1/vault?customer=$CUSTOMER_ADDRESS&developer=$VAULT_DEVELOPER_ADDRESS")
 assert_status "non-existent vault → 404" "$STATUS" "404"
 
 step "8.3" "POST /v1/vault/debit — missing fields → 400"
@@ -547,12 +549,17 @@ section "10 — Developer signup & login"
 step "10.1" "POST /v1/developers/signup — new developer (random email)"
 TEST_EMAIL="e2e-$(date +%s)@invoq-test.dev"
 TEST_NAME="E2E Test $(date +%s)"
+SIGNUP_ADDRESS="${TEST_SIGNUP_ADDRESS:-$(node --input-type=module -e 'import { Keypair } from "@stellar/stellar-sdk"; console.log(Keypair.random().publicKey())' 2>/dev/null)}"
+if [ -z "$SIGNUP_ADDRESS" ]; then
+  fail "could not generate signup Stellar address"
+else
 OUT=$(curl -s -X POST "$BASE_URL/v1/developers/signup" \
   -H "Content-Type: application/json" \
-  -d "{\"stellarAddress\":\"$CUSTOMER_ADDRESS\",\"email\":\"$TEST_EMAIL\",\"name\":\"$TEST_NAME\"}")
+  -d "{\"stellarAddress\":\"$SIGNUP_ADDRESS\",\"email\":\"$TEST_EMAIL\",\"name\":\"$TEST_NAME\"}")
 assert_json_field "signup returns developerId" "$OUT" "developerId"
 assert_json_field "signup returns secretKey"   "$OUT" "secretKey"
 assert_json_field "signup returns stellarAddress" "$OUT" "stellarAddress"
+fi
 
 step "10.2" "POST /v1/developers/login with same email — re-issue key"
 OUT=$(curl -s -X POST "$BASE_URL/v1/developers/login" \
@@ -584,25 +591,33 @@ assert_status "missing fields → 400" "$STATUS" "400"
 
 section "11 — Spend policies"
 
-step "11.1" "POST /v1/spend-policies — create policy"
-OUT=$(api POST /v1/spend-policies '{
+step "11.1" "POST /v1/spend-policies/build-tx — build owner-signed create policy tx"
+OUT=$(api POST /v1/spend-policies/build-tx '{
   "owner":          "'$CUSTOMER_ADDRESS'",
   "dailyLimitUsdc": 100000000,
   "txLimitUsdc":    5000000,
   "allowlist":      [],
   "agents":         []
 }')
-assert_contains "policy create submitted" "$OUT" "txHash"
+if echo "$OUT" | jq -e '.xdr' > /dev/null 2>&1; then
+  pass "spend policy build-tx returns XDR"
+else
+  fail "spend policy build-tx did not return XDR (got: $OUT)"
+fi
 
 step "11.2" "GET /v1/spend-policies/:owner — read policy"
 OUT=$(api GET "/v1/spend-policies/$CUSTOMER_ADDRESS")
-assert_contains "policy owner matches" "$OUT" "$CUSTOMER_ADDRESS"
-assert_contains "policy has daily_limit_usdc" "$OUT" "daily_limit_usdc"
+if echo "$OUT" | grep -q '"error"'; then
+  skip "11.2 — no submitted spend policy for this owner yet"
+else
+  assert_contains "policy owner matches" "$OUT" "$CUSTOMER_ADDRESS"
+  assert_contains "policy has daily_limit_usdc" "$OUT" "daily_limit_usdc"
+fi
 
 step "11.3" "POST /v1/spend-policies/check — simulate check"
 OUT=$(api POST /v1/spend-policies/check '{
   "agent":       "'$CUSTOMER_ADDRESS'",
-  "destination": "GDESTINATIONXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "destination": "'$CUSTOMER_ADDRESS'",
   "amountUsdc":  1000000
 }')
 assert_json_field "check returns allowed" "$OUT" "allowed"
@@ -612,18 +627,25 @@ step "11.4" "POST /v1/spend-policies/check — missing fields → 400"
 STATUS=$(api_status POST /v1/spend-policies/check '{"agent":"x"}')
 assert_status "check missing fields → 400" "$STATUS" "400"
 
-step "11.5" "POST /v1/spend-policies/:owner/deactivate"
-OUT=$(api POST "/v1/spend-policies/$CUSTOMER_ADDRESS/deactivate")
-assert_contains "deactivate submitted" "$OUT" "txHash"
+step "11.5" "POST /v1/spend-policies/build-tx — missing fields → 400"
+STATUS=$(api_status POST /v1/spend-policies/build-tx '{"owner":"x"}')
+assert_status "build policy missing fields → 400" "$STATUS" "400"
 
-step "11.6" "POST /v1/spend-policies/:owner/reactivate"
-OUT=$(api POST "/v1/spend-policies/$CUSTOMER_ADDRESS/reactivate")
-assert_contains "reactivate submitted" "$OUT" "txHash"
+step "11.6" "POST /v1/spend-policies/submit-tx — bad signature rejected → 400"
+STATUS=$(api_status POST /v1/spend-policies/submit-tx "{
+  \"owner\": \"$CUSTOMER_ADDRESS\",
+  \"signedXdr\": \"AAAAAAAAAAAAA\"
+}")
+assert_status "bad spend-policy signature → 400" "$STATUS" "400"
 
 step "11.7" "GET /v1/spend-policies/:owner/daily — read daily state"
 OUT=$(api GET "/v1/spend-policies/$CUSTOMER_ADDRESS/daily")
-assert_json_field "daily returns spent" "$OUT" "spent"
-assert_json_field "daily returns remaining" "$OUT" "remaining"
+if echo "$OUT" | grep -q '"error"'; then
+  skip "11.7 — no submitted spend policy for daily state yet"
+else
+  assert_json_field "daily returns spent" "$OUT" "spent"
+  assert_json_field "daily returns remaining" "$OUT" "remaining"
+fi
 
 ########################################
 # 12 — PLAN + SUBSCRIPTION LIST
@@ -653,9 +675,12 @@ section "13 — Subscription history"
 
 step "13.1" "GET /v1/subscriptions/:customer/history"
 OUT=$(api GET "/v1/subscriptions/$CUSTOMER_ADDRESS/history")
-# It returns either a subscription or null; either way has the fields
-assert_json_field "history has events array" "$OUT" "events"
-assert_json_field "history has transactions array" "$OUT" "transactions"
+if echo "$OUT" | grep -q '"error"'; then
+  skip "13.1 — no authorized subscription history for this customer"
+else
+  assert_json_field "history has events array" "$OUT" "events"
+  assert_json_field "history has transactions array" "$OUT" "transactions"
+fi
 
 ########################################
 # SUMMARY

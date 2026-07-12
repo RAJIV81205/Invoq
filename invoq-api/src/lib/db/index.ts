@@ -36,9 +36,7 @@ function getDatabaseName(uri: string): string {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __mongoClient: MongoClient | undefined;
-  // eslint-disable-next-line no-var
   var __mongoDbPromise: Promise<Db> | undefined;
 }
 
@@ -108,9 +106,10 @@ async function col<T extends Document>(name: string): Promise<Collection<T>> {
   return db.collection<T>(name);
 }
 
-async function stripId<T extends { _id?: unknown }>(doc: T | null): Promise<any> {
+function stripId<T extends { _id?: unknown }>(doc: T | null): Omit<T, "_id"> | null {
   if (!doc) return null;
-  const { _id, ...rest } = doc as Record<string, unknown>;
+  const rest = { ...doc };
+  delete rest._id;
   return rest;
 }
 
@@ -188,8 +187,7 @@ export async function listApiKeysByDeveloper(developerId: string): Promise<ApiKe
     .sort({ createdAt: -1 })
     .toArray())
     .map((row) => {
-      const { _id, ...rest } = row;
-      return rest as ApiKeyRecord;
+      return stripId(row) as ApiKeyRecord;
     });
 }
 
@@ -210,8 +208,7 @@ export async function listWebhookEndpointsByDeveloper(developerId: string): Prom
     .find({ developerId })
     .toArray())
     .map((row) => {
-      const { _id, ...rest } = row;
-      return rest as WebhookEndpointRecord;
+      return stripId(row) as WebhookEndpointRecord;
     });
 }
 
@@ -229,8 +226,7 @@ export async function listWebhookDeliveriesByDeveloper(developerId: string): Pro
     .sort({ createdAt: -1 })
     .toArray())
     .map((row) => {
-      const { _id, ...rest } = row;
-      return rest as WebhookDeliveryRecord;
+      return stripId(row) as WebhookDeliveryRecord;
     });
 }
 
@@ -320,8 +316,7 @@ export async function listTransactionLogByDeveloper(developerId: string, limit =
     .limit(limit)
     .toArray())
     .map((row) => {
-      const { _id, ...rest } = row;
-      return rest as TransactionLogRecord;
+      return stripId(row) as TransactionLogRecord;
     });
 }
 

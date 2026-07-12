@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getApiError, getErrorMessage } from "@/app/lib/errors";
 
 export default function DeactivateButton({ planId, active }: { planId: string; active: boolean }) {
   const router = useRouter();
@@ -18,12 +19,12 @@ export default function DeactivateButton({ planId, active }: { planId: string; a
       const res = await fetch(path, { method: active ? "DELETE" : "POST" });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setErr(d?.error ?? "Failed");
+        setErr(getApiError(d, "Failed"));
         return;
       }
       router.refresh();
-    } catch (e: any) {
-      setErr(e?.message ?? "Network error");
+    } catch (e: unknown) {
+      setErr(getErrorMessage(e));
     } finally {
       setBusy(false);
     }

@@ -298,7 +298,7 @@ async function pollTransaction(
           const resultCode = txResult.result().switch().name;
           
           // Get operation-specific errors
-          let opErrors: string[] = [];
+          const opErrors: string[] = [];
           if (resultCode === 'txFailed') {
             const results = txResult.result().results();
             results.forEach((opResult, idx) => {

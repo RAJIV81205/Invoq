@@ -1,5 +1,6 @@
 import { requireSession, apiFetch } from "@/app/lib/auth-cookie";
 import EmptyState from "@/app/components/EmptyState";
+import type { DashboardPlan, DashboardSubscription } from "@/app/lib/types";
 
 export default async function UsagePage() {
   const session = await requireSession();
@@ -7,9 +8,9 @@ export default async function UsagePage() {
     apiFetch(session, "/v1/subscriptions"),
     apiFetch(session, "/v1/plans"),
   ]);
-  const subs: any[] = subsRes.ok ? (await subsRes.json()).subscriptions ?? [] : [];
+  const subs: DashboardSubscription[] = subsRes.ok ? (await subsRes.json()).subscriptions ?? [] : [];
   const plansData = plansRes.ok ? await plansRes.json() : { plans: [] };
-  const plans: any[] = plansData.plans ?? [];
+  const plans: DashboardPlan[] = plansData.plans ?? [];
 
   // Aggregate by plan
   const byPlan = new Map<number, { name: string; usage: number; subs: number }>();

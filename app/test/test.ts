@@ -2,6 +2,7 @@ import type { ReportFn, TestResult } from "@/lib/types";
 import { api, apiNoAuth } from "@/lib/apiClient";
 import { signXdr } from "@/lib/freighter";
 import { NETWORK_PASSPHRASE } from "@/lib/config";
+import { getErrorMessage } from "@/app/lib/errors";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -13,6 +14,19 @@ function fail(label: string, detail?: string): TestResult {
 }
 function skip(label: string, reason?: string): TestResult {
   return { label, status: "skip", detail: reason };
+}
+
+function hasIdAndType(value: unknown, id: string | null, type: string): boolean {
+  return typeof value === "object"
+    && value !== null
+    && (value as { id?: unknown }).id === id
+    && (value as { type?: unknown }).type === type;
+}
+
+function hasWebhookId(value: unknown, id: string | null): boolean {
+  return typeof value === "object"
+    && value !== null
+    && (value as { id?: unknown }).id === id;
 }
 
 async function timed<T>(fn: () => Promise<T>): Promise<{ result: T; ms: number }> {
@@ -36,7 +50,7 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
     method: string,
     path: string,
     opts?: { body?: unknown; headers?: Record<string, string> },
-  ): Promise<{ status: number; data: any }> {
+  ): Promise<{ status: number; data: unknown }> {
     const res = await fetch(`http://localhost:3001${path}`, {
       method,
       headers: {
@@ -45,7 +59,7 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
       },
       body: opts?.body !== undefined ? JSON.stringify(opts.body) : undefined,
     });
-    let data: any = null;
+    let data: unknown = null;
     try {
       data = await res.json();
     } catch {
@@ -122,8 +136,8 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
   {
     const r = await api("GET", "/v1/keys");
     const ok = Array.isArray(r.data)
-      && r.data.some((k: any) => k.id === publishableKeyId && k.type === "pk")
-      && r.data.some((k: any) => k.id === rotatedSecretKeyId && k.type === "sk");
+      && r.data.some((k) => hasIdAndType(k, publishableKeyId, "pk"))
+      && r.data.some((k) => hasIdAndType(k, rotatedSecretKeyId, "sk"));
     report(s0, ok
       ? pass("List keys includes created pk/sk")
       : fail("List keys includes created pk/sk", r.error ?? JSON.stringify(r.data)));
@@ -223,8 +237,8 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
         report(s1, planId
           ? pass("Submit signed plan tx", `Plan ID: ${planId}`, submitRes.data?.txHash)
           : fail("Submit signed plan tx", submitRes.error ?? "No planId"));
-      } catch (e: any) {
-        report(s1, fail("Developer signed plan tx", e.message));
+      } catch (e: unknown) {
+        report(s1, fail("Developer signed plan tx", getErrorMessage(e)));
       }
     }
   }
@@ -256,8 +270,8 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
         report(s1, freePlanId
           ? pass("Submit signed free plan tx", `Plan ID: ${freePlanId}`, submitRes.data?.txHash)
           : fail("Submit signed free plan tx", submitRes.error ?? "No planId"));
-      } catch (e: any) {
-        report(s1, fail("Developer signed free plan tx", e.message));
+      } catch (e: unknown) {
+        report(s1, fail("Developer signed free plan tx", getErrorMessage(e)));
       }
     }
   }
@@ -315,8 +329,8 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
         report(s1, submitRes.data?.txHash
           ? pass("Submit signed update plan tx", undefined, submitRes.data.txHash)
           : fail("Submit signed update plan tx", submitRes.error ?? "No txHash"));
-      } catch (e: any) {
-        report(s1, fail("Developer signed update plan tx", e.message));
+      } catch (e: unknown) {
+        report(s1, fail("Developer signed update plan tx", getErrorMessage(e)));
       }
     }
   } else {
@@ -345,8 +359,8 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
         report(s1, submitRes.data?.txHash
           ? pass("Submit signed deactivate plan tx", undefined, submitRes.data.txHash)
           : fail("Submit signed deactivate plan tx", submitRes.error ?? "No txHash"));
-      } catch (e: any) {
-        report(s1, fail("Developer signed deactivate plan tx", e.message));
+      } catch (e: unknown) {
+        report(s1, fail("Developer signed deactivate plan tx", getErrorMessage(e)));
       }
     }
   } else {
@@ -375,8 +389,8 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
         report(s1, submitRes.data?.txHash
           ? pass("Submit signed reactivate plan tx", undefined, submitRes.data.txHash)
           : fail("Submit signed reactivate plan tx", submitRes.error ?? "No txHash"));
-      } catch (e: any) {
-        report(s1, fail("Developer signed reactivate plan tx", e.message));
+      } catch (e: unknown) {
+        report(s1, fail("Developer signed reactivate plan tx", getErrorMessage(e)));
       }
     }
   } else {
@@ -429,8 +443,8 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
       report(s2, submitRes.data?.txHash
         ? pass("Submit subscribe tx", undefined, submitRes.data.txHash, ms)
         : fail("Submit subscribe tx", submitRes.error ?? "No txHash"));
-    } catch (e: any) {
-      report(s2, fail("Sign + submit subscribe tx", e.message));
+    } catch (e: unknown) {
+      report(s2, fail("Sign + submit subscribe tx", getErrorMessage(e)));
     }
   } else {
     report(s2, skip("Sign subscribe tx", "no XDR or already subscribed"));
@@ -485,8 +499,8 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
       report(s2, submitRes.data?.txHash
         ? pass("Submit vault creation tx", undefined, submitRes.data.txHash, ms)
         : fail("Submit vault creation tx", submitRes.error ?? "No txHash"));
-    } catch (e: any) {
-      report(s2, fail("Sign + submit vault tx", e.message));
+    } catch (e: unknown) {
+      report(s2, fail("Sign + submit vault tx", getErrorMessage(e)));
     }
   } else {
     report(s2, skip("Sign vault tx", "no XDR or vault already exists"));
@@ -497,9 +511,10 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
 
   {
     const r = await api("GET", `/v1/entitlement?customer=${developerAddress}&feature=api_access`);
-    const hasEntitled = r.data !== null && "entitled" in (r.data ?? {});
+    const data = r.data;
+    const hasEntitled = data !== null && "entitled" in data;
     report(s3, hasEntitled
-      ? pass("Check entitlement (chain)", `entitled: ${r.data.entitled}, source: ${r.data.source}`)
+      ? pass("Check entitlement (chain)", `entitled: ${data.entitled}, source: ${data.source}`)
       : fail("Check entitlement", r.error ?? JSON.stringify(r.data)));
   }
 
@@ -560,9 +575,10 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
 
   {
     const r = await api("GET", `/v1/usage/${developerAddress}`);
-    const ok = r.data && "usageCurrent" in r.data;
+    const data = r.data;
+    const ok = data && "usageCurrent" in data;
     report(s4, ok
-      ? pass("Read usage", `usageCurrent: ${r.data.usageCurrent}, status: ${r.data.status}`)
+      ? pass("Read usage", `usageCurrent: ${data.usageCurrent}, status: ${data.status}`)
       : skip("Read usage", "no subscription yet"));
   }
 
@@ -571,9 +587,10 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
 
   {
     const { result: r, ms } = await timed(() => api("GET", `/v1/subscriptions/${developerAddress}`));
-    const ok = r.data && "plan_id" in r.data;
+    const data = r.data;
+    const ok = data && "plan_id" in data;
     report(s5, ok
-      ? pass("Read subscription", `plan: ${r.data.plan_id}, status: ${r.data.status}`, undefined, ms)
+      ? pass("Read subscription", `plan: ${data.plan_id}, status: ${data.status}`, undefined, ms)
       : skip("Read subscription", "no active subscription"));
   }
 
@@ -616,8 +633,9 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
       api("GET", `/v1/vault?customer=${developerAddress}&developer=${developerAddress}`)
     );
     vaultExists = r.status === 200 && r.data !== null;
+    const data = r.data;
     report(s6, vaultExists
-      ? pass("Vault exists", `balance: ${r.data.balance_usdc}`, undefined, ms)
+      ? pass("Vault exists", `balance: ${data?.balance_usdc}`, undefined, ms)
       : r.status === 404
         ? skip("Vault check", "Vault not created yet")
         : fail("Vault check", r.error ?? ""));
@@ -683,8 +701,8 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
         report(s6, submitRes.data?.txHash
           ? pass("Submit withdraw tx", undefined, submitRes.data.txHash)
           : fail("Submit withdraw tx", submitRes.error ?? "No txHash"));
-      } catch (e: any) {
-        report(s6, fail("Customer signed withdraw tx", e.message));
+      } catch (e: unknown) {
+        report(s6, fail("Customer signed withdraw tx", getErrorMessage(e)));
       }
     }
   } else {
@@ -724,8 +742,8 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
         report(s6, submitRes.data?.txHash
           ? pass("Submit threshold update tx", undefined, submitRes.data.txHash)
           : fail("Submit threshold update tx", submitRes.error ?? "No txHash"));
-      } catch (e: any) {
-        report(s6, fail("Customer signed threshold update tx", e.message));
+      } catch (e: unknown) {
+        report(s6, fail("Customer signed threshold update tx", getErrorMessage(e)));
       }
     }
   } else {
@@ -756,10 +774,10 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
   }
 
   {
-    const r = await api("GET", "/v1/webhooks");
-    const isArr = Array.isArray(r.data);
-    report(s7, isArr
-      ? pass("List webhooks", `${r.data.length} endpoint(s)`)
+    const r = await api<unknown[]>("GET", "/v1/webhooks");
+    const endpoints = Array.isArray(r.data) ? r.data : null;
+    report(s7, endpoints
+      ? pass("List webhooks", `${endpoints.length} endpoint(s)`)
       : fail("List webhooks", r.error ?? "Not array"));
   }
 
@@ -795,7 +813,7 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
 
   {
     const r = await api("GET", "/v1/webhooks");
-    const stillThere = Array.isArray(r.data) && r.data.some((e: any) => e.id === webhookId);
+    const stillThere = Array.isArray(r.data) && r.data.some((e) => hasWebhookId(e, webhookId));
     report(s7, !stillThere
       ? pass("Deleted endpoint gone from list")
       : fail("Deleted endpoint still in list"));
@@ -867,7 +885,7 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
   {
     const { result: r, ms } = await timed(() => api("POST", "/v1/spend-policies/check", {
       agent:       developerAddress,
-      destination: "GDESTINATIONXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      destination: developerAddress,
       amountUsdc:  1000000,
     }));
     report(s8, typeof r.data?.allowed === "boolean"

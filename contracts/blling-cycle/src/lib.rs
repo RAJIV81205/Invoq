@@ -33,20 +33,22 @@
 //! BillingCycle holds NO funds — it only routes transfers.
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, contractevent,
-    Address, Env, Vec, Symbol, IntoVal,
-    panic_with_error, log,
+    contract, contracterror, contractevent, contractimpl, contracttype, log, panic_with_error,
+    Address, Env, IntoVal, Symbol, Vec,
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LEDGERS_PER_YEAR: u32   = 6_307_200;
+const LEDGERS_PER_YEAR: u32 = 6_307_200;
 const PERSISTENT_TTL_THRESHOLD: u32 = LEDGERS_PER_YEAR;
-const PERSISTENT_TTL_BUMP:      u32 = LEDGERS_PER_YEAR;
+const PERSISTENT_TTL_BUMP: u32 = LEDGERS_PER_YEAR;
 
-/// Maximum customers per process_renewals or expire_grace_periods call.
+/// Maximum customers per process_renewals call.
 /// Tuned to stay within Soroban's instruction limit with cross-contract calls.
-const MAX_BATCH_SIZE: u32 = 30;
+const MAX_RENEWAL_BATCH_SIZE: u32 = 30;
+
+/// Maximum customers per expire_grace_periods call.
+const MAX_GRACE_EXPIRY_BATCH_SIZE: u32 = 50;
 
 /// Default grace period: 3 days in seconds
 const DEFAULT_GRACE_SECONDS: u64 = 259_200;
@@ -61,26 +63,26 @@ const MIN_GRACE_SECONDS: u64 = 3_600;
 #[repr(u32)]
 pub enum Error {
     // Initialisation
-    AlreadyInitialized     = 1,
-    NotInitialized         = 2,
+    AlreadyInitialized = 1,
+    NotInitialized = 2,
 
     // Auth
-    Unauthorized           = 10,
+    Unauthorized = 10,
 
     // Batch
-    BatchTooLarge          = 20,
+    BatchTooLarge = 20,
 
     // Grace period
-    InvalidGracePeriod     = 30,
-    NotInGracePeriod       = 31,
+    InvalidGracePeriod = 30,
+    NotInGracePeriod = 31,
 
     // Subscription state
-    SubscriptionNotFound   = 40,
-    AlreadySubscribed      = 41,
-    PlanNotActive          = 42,
-    InsufficientAllowance  = 43,
-    PaymentFailed          = 44,
-    InvalidPeriod          = 45,
+    SubscriptionNotFound = 40,
+    AlreadySubscribed = 41,
+    PlanNotActive = 42,
+    InsufficientAllowance = 43,
+    PaymentFailed = 44,
+    InvalidPeriod = 45,
 }
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
@@ -142,36 +144,43 @@ pub struct RenewalSummary {
 
 #[contractevent]
 pub struct SubscriptionInitiated {
-    #[topic] pub customer: Address,
-    #[topic] pub plan_id:  u64,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub plan_id: u64,
     pub amount_usdc: i128,
     pub period_end: u64,
 }
 
 #[contractevent]
 pub struct RenewalSucceeded {
-    #[topic] pub customer:    Address,
-    #[topic] pub plan_id:     u64,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub plan_id: u64,
     pub amount_usdc: i128,
     pub new_period_end: u64,
 }
 
 #[contractevent]
 pub struct RenewalFailed {
-    #[topic] pub customer: Address,
+    #[topic]
+    pub customer: Address,
     pub amount_usdc: i128,
     pub grace_expires_at: u64,
 }
 
 #[contractevent]
 pub struct GracePeriodExpired {
-    #[topic] pub customer: Address,
+    #[topic]
+    pub customer: Address,
     pub expired_at: u64,
 }
 
 #[contractevent]
 pub struct PaymentRetried {
-    #[topic] pub customer: Address,
+    #[topic]
+    pub customer: Address,
     pub success: bool,
 }
 
@@ -217,31 +226,31 @@ mod registry {
     #[contracttype]
     #[derive(Clone)]
     pub struct SubscriptionRecord {
-        pub customer:             Address,
-        pub plan_id:              u64,
-        pub status:               SubStatus,
-        pub started_at:           u64,
+        pub customer: Address,
+        pub plan_id: u64,
+        pub status: SubStatus,
+        pub started_at: u64,
         pub current_period_start: u64,
-        pub current_period_end:   u64,
-        pub trial_end:            u64,
+        pub current_period_end: u64,
+        pub trial_end: u64,
         pub cancel_at_period_end: bool,
-        pub usage_current:        u64,
+        pub usage_current: u64,
     }
 
     // Mirror PlanConfig for reading plan price and interval
     #[contracttype]
     #[derive(Clone)]
     pub struct PlanConfig {
-        pub plan_id:          u64,
-        pub name:             String,
-        pub price_usdc:       i128,
+        pub plan_id: u64,
+        pub name: String,
+        pub price_usdc: i128,
         pub interval_seconds: u64,
-        pub trial_seconds:    u64,
-        pub usage_limit:      u64,
-        pub features:         Vec<String>,
-        pub active:           bool,
-        pub owner:            Address,
-        pub created_at:       u64,
+        pub trial_seconds: u64,
+        pub usage_limit: u64,
+        pub features: Vec<String>,
+        pub active: bool,
+        pub owner: Address,
+        pub created_at: u64,
     }
 }
 
@@ -291,10 +300,7 @@ fn store_grace_record(env: &Env, record: &GraceRecord) {
 
 fn load_grace_record(env: &Env, customer: &Address) -> Option<GraceRecord> {
     let key = DataKey::GraceRecord(customer.clone());
-    let result = env
-        .storage()
-        .persistent()
-        .get::<DataKey, GraceRecord>(&key);
+    let result = env.storage().persistent().get::<DataKey, GraceRecord>(&key);
     if result.is_some() {
         env.storage()
             .persistent()
@@ -329,11 +335,7 @@ fn registry_get_subscription(
     )
 }
 
-fn registry_get_plan(
-    env: &Env,
-    registry: &Address,
-    plan_id: u64,
-) -> Option<registry::PlanConfig> {
+fn registry_get_plan(env: &Env, registry: &Address, plan_id: u64) -> Option<registry::PlanConfig> {
     env.invoke_contract(
         registry,
         &Symbol::new(env, "get_plan"),
@@ -341,12 +343,7 @@ fn registry_get_plan(
     )
 }
 
-fn registry_create_subscription(
-    env: &Env,
-    registry: &Address,
-    customer: &Address,
-    plan_id: u64,
-) {
+fn registry_create_subscription(env: &Env, registry: &Address, customer: &Address, plan_id: u64) {
     let _: registry::SubscriptionRecord = env.invoke_contract(
         registry,
         &Symbol::new(env, "create_subscription"),
@@ -445,7 +442,6 @@ pub struct BillingCycle;
 
 #[contractimpl]
 impl BillingCycle {
-
     // ═════════════════════════════════════════════════════════════════════════
     // INITIALISATION
     // ═════════════════════════════════════════════════════════════════════════
@@ -474,10 +470,14 @@ impl BillingCycle {
             panic_with_error!(&env, Error::InvalidGracePeriod);
         }
 
-        env.storage().instance().set(&DataKey::Admin,              &admin);
-        env.storage().instance().set(&DataKey::RegistryId,         &registry_id);
-        env.storage().instance().set(&DataKey::UsdcSac,            &usdc_sac);
-        env.storage().instance().set(&DataKey::GracePeriodSeconds,  &grace_period_seconds);
+        env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage()
+            .instance()
+            .set(&DataKey::RegistryId, &registry_id);
+        env.storage().instance().set(&DataKey::UsdcSac, &usdc_sac);
+        env.storage()
+            .instance()
+            .set(&DataKey::GracePeriodSeconds, &grace_period_seconds);
 
         log!(&env, "BillingCycle initialized. registry={}", registry_id);
     }
@@ -534,7 +534,7 @@ impl BillingCycle {
         // Load plan from Registry to get price and owner
         let plan = match registry_get_plan(&env, &registry, plan_id) {
             Some(p) => p,
-            None    => panic_with_error!(&env, Error::PlanNotActive),
+            None => panic_with_error!(&env, Error::PlanNotActive),
         };
 
         if !plan.active {
@@ -558,20 +558,14 @@ impl BillingCycle {
         };
 
         if initial_charge > 0 {
-            let ok = try_transfer_usdc(
-                &env,
-                &usdc_sac,
-                &customer,
-                &plan.owner,
-                initial_charge,
-            );
+            let ok = try_transfer_usdc(&env, &usdc_sac, &customer, &plan.owner, initial_charge);
             if !ok {
                 panic_with_error!(&env, Error::PaymentFailed);
             }
         }
 
         // Compute period end for the event (Registry computes it internally too)
-        let now        = env.ledger().timestamp();
+        let now = env.ledger().timestamp();
         let period_end = now + plan.interval_seconds;
 
         // Write subscription record to Registry (BillingCycle is the operator)
@@ -618,26 +612,29 @@ impl BillingCycle {
     pub fn process_renewals(env: Env, customers: Vec<Address>) -> RenewalSummary {
         require_admin(&env);
 
-        if customers.len() > MAX_BATCH_SIZE {
+        if customers.len() > MAX_RENEWAL_BATCH_SIZE {
             panic_with_error!(&env, Error::BatchTooLarge);
         }
 
-        let registry      = load_registry_id(&env);
-        let usdc_sac      = load_usdc_sac(&env);
+        let registry = load_registry_id(&env);
+        let usdc_sac = load_usdc_sac(&env);
         let grace_seconds = load_grace_seconds(&env);
-        let now           = env.ledger().timestamp();
+        let now = env.ledger().timestamp();
 
-        let mut renewed:           u32 = 0;
-        let mut grace_entered:     u32 = 0;
-        let mut grace_retry_failed:u32 = 0;
-        let mut skipped:           u32 = 0;
+        let mut renewed: u32 = 0;
+        let mut grace_entered: u32 = 0;
+        let mut grace_retry_failed: u32 = 0;
+        let mut skipped: u32 = 0;
 
         for i in 0..customers.len() {
             let customer = customers.get(i).unwrap();
 
             let sub = match registry_get_subscription(&env, &registry, &customer) {
                 Some(s) => s,
-                None    => { skipped += 1; continue; }
+                None => {
+                    skipped += 1;
+                    continue;
+                }
             };
 
             // Skip terminal states
@@ -661,12 +658,7 @@ impl BillingCycle {
 
             // Scheduled cancellation — close subscription, no payment
             if sub.cancel_at_period_end {
-                registry_update_status(
-                    &env,
-                    &registry,
-                    &customer,
-                    registry::SubStatus::Cancelled,
-                );
+                registry_update_status(&env, &registry, &customer, registry::SubStatus::Cancelled);
                 skipped += 1;
                 continue;
             }
@@ -674,22 +666,20 @@ impl BillingCycle {
             // Load plan for price and owner
             let plan = match registry_get_plan(&env, &registry, sub.plan_id) {
                 Some(p) => p,
-                None    => { skipped += 1; continue; } // Plan deleted — skip
+                None => {
+                    skipped += 1;
+                    continue;
+                } // Plan deleted — skip
             };
 
             let new_period_start = sub.current_period_end;
-            let new_period_end   = sub.current_period_end + plan.interval_seconds;
+            let new_period_end = sub.current_period_end + plan.interval_seconds;
 
             match sub.status {
                 registry::SubStatus::Active | registry::SubStatus::Trialing => {
                     // First renewal attempt
-                    let ok = try_transfer_usdc(
-                        &env,
-                        &usdc_sac,
-                        &customer,
-                        &plan.owner,
-                        plan.price_usdc,
-                    );
+                    let ok =
+                        try_transfer_usdc(&env, &usdc_sac, &customer, &plan.owner, plan.price_usdc);
 
                     if ok {
                         registry_renew_subscription(
@@ -700,9 +690,9 @@ impl BillingCycle {
                             new_period_end,
                         );
                         RenewalSucceeded {
-                            customer:      customer.clone(),
-                            plan_id:       sub.plan_id,
-                            amount_usdc:   plan.price_usdc,
+                            customer: customer.clone(),
+                            plan_id: sub.plan_id,
+                            amount_usdc: plan.price_usdc,
                             new_period_end,
                         }
                         .publish(&env);
@@ -718,18 +708,21 @@ impl BillingCycle {
                             registry::SubStatus::GracePeriod,
                         );
 
-                        store_grace_record(&env, &GraceRecord {
-                            customer:         customer.clone(),
-                            grace_started_at: now,
-                            amount_usdc:      plan.price_usdc,
-                            plan_owner:       plan.owner.clone(),
-                            new_period_start,
-                            new_period_end,
-                        });
+                        store_grace_record(
+                            &env,
+                            &GraceRecord {
+                                customer: customer.clone(),
+                                grace_started_at: now,
+                                amount_usdc: plan.price_usdc,
+                                plan_owner: plan.owner.clone(),
+                                new_period_start,
+                                new_period_end,
+                            },
+                        );
 
                         RenewalFailed {
-                            customer:        customer.clone(),
-                            amount_usdc:     plan.price_usdc,
+                            customer: customer.clone(),
+                            amount_usdc: plan.price_usdc,
                             grace_expires_at,
                         }
                         .publish(&env);
@@ -741,7 +734,10 @@ impl BillingCycle {
                     // Retry payment for a subscription already in grace period
                     let grace_record = match load_grace_record(&env, &customer) {
                         Some(r) => r,
-                        None    => { skipped += 1; continue; }
+                        None => {
+                            skipped += 1;
+                            continue;
+                        }
                     };
 
                     let ok = try_transfer_usdc(
@@ -764,9 +760,9 @@ impl BillingCycle {
                         remove_grace_record(&env, &customer);
 
                         RenewalSucceeded {
-                            customer:      customer.clone(),
-                            plan_id:       sub.plan_id,
-                            amount_usdc:   grace_record.amount_usdc,
+                            customer: customer.clone(),
+                            plan_id: sub.plan_id,
+                            amount_usdc: grace_record.amount_usdc,
                             new_period_end: grace_record.new_period_end,
                         }
                         .publish(&env);
@@ -790,7 +786,9 @@ impl BillingCycle {
                     }
                 }
 
-                _ => { skipped += 1; }
+                _ => {
+                    skipped += 1;
+                }
             }
         }
 
@@ -822,37 +820,32 @@ impl BillingCycle {
     pub fn expire_grace_periods(env: Env, customers: Vec<Address>) -> u32 {
         require_admin(&env);
 
-        if customers.len() > 50 {
+        if customers.len() > MAX_GRACE_EXPIRY_BATCH_SIZE {
             panic_with_error!(&env, Error::BatchTooLarge);
         }
 
-        let registry      = load_registry_id(&env);
+        let registry = load_registry_id(&env);
         let grace_seconds = load_grace_seconds(&env);
-        let now           = env.ledger().timestamp();
-        let mut expired   = 0u32;
+        let now = env.ledger().timestamp();
+        let mut expired = 0u32;
 
         for i in 0..customers.len() {
             let customer = customers.get(i).unwrap();
 
             let grace_record = match load_grace_record(&env, &customer) {
                 Some(r) => r,
-                None    => continue, // No grace record — skip
+                None => continue, // No grace record — skip
             };
 
             let grace_expires_at = grace_record.grace_started_at + grace_seconds;
 
             if now >= grace_expires_at {
                 // Grace window closed — cancel subscription
-                registry_update_status(
-                    &env,
-                    &registry,
-                    &customer,
-                    registry::SubStatus::Cancelled,
-                );
+                registry_update_status(&env, &registry, &customer, registry::SubStatus::Cancelled);
                 remove_grace_record(&env, &customer);
 
                 GracePeriodExpired {
-                    customer:   customer.clone(),
+                    customer: customer.clone(),
                     expired_at: now,
                 }
                 .publish(&env);
@@ -881,7 +874,7 @@ impl BillingCycle {
 
         let grace_record = match load_grace_record(&env, &customer) {
             Some(r) => r,
-            None    => panic_with_error!(&env, Error::NotInGracePeriod),
+            None => panic_with_error!(&env, Error::NotInGracePeriod),
         };
 
         let registry = load_registry_id(&env);
@@ -923,6 +916,11 @@ impl BillingCycle {
         ok
     }
 
+    /// Spec-compatible alias for retry_payment.
+    pub fn retry_failed_payment(env: Env, customer: Address) -> bool {
+        Self::retry_payment(env, customer)
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // CONFIGURATION
     // ═════════════════════════════════════════════════════════════════════════
@@ -951,6 +949,11 @@ impl BillingCycle {
             new_seconds: new_grace_seconds,
         }
         .publish(&env);
+    }
+
+    /// Spec-compatible alias for set_grace_period.
+    pub fn update_grace_period(env: Env, new_grace_seconds: u64) {
+        Self::set_grace_period(env, new_grace_seconds)
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -989,18 +992,13 @@ mod tests {
         let env = Env::default();
         env.mock_all_auths();
 
-        let contract_id = env.register_contract(None, BillingCycle);
-        let client      = BillingCycleClient::new(&env, &contract_id);
-        let admin       = Address::generate(&env);
-        let registry    = Address::generate(&env); // mock address for unit tests
-        let usdc_sac    = Address::generate(&env);
+        let contract_id = env.register(BillingCycle, ());
+        let client = BillingCycleClient::new(&env, &contract_id);
+        let admin = Address::generate(&env);
+        let registry = Address::generate(&env); // mock address for unit tests
+        let usdc_sac = Address::generate(&env);
 
-        client.initialize(
-            &admin,
-            &registry,
-            &usdc_sac,
-            &DEFAULT_GRACE_SECONDS,
-        );
+        client.initialize(&admin, &registry, &usdc_sac, &DEFAULT_GRACE_SECONDS);
 
         (env, client, admin)
     }
@@ -1021,10 +1019,10 @@ mod tests {
 
     #[test]
     fn test_initialize_invalid_grace_period() {
-        let env         = Env::default();
+        let env = Env::default();
         env.mock_all_auths();
-        let contract_id = env.register_contract(None, BillingCycle);
-        let client      = BillingCycleClient::new(&env, &contract_id);
+        let contract_id = env.register(BillingCycle, ());
+        let client = BillingCycleClient::new(&env, &contract_id);
 
         let result = client.try_initialize(
             &Address::generate(&env),
@@ -1051,6 +1049,13 @@ mod tests {
     }
 
     #[test]
+    fn test_update_grace_period_alias() {
+        let (_env, client, _admin) = setup();
+        client.update_grace_period(&172_800u64); // 2 days
+        assert_eq!(client.get_grace_period(), 172_800u64);
+    }
+
+    #[test]
     fn test_set_grace_period_too_low_rejected() {
         let (_env, client, _admin) = setup();
         assert!(client.try_set_grace_period(&100u64).is_err());
@@ -1062,7 +1067,7 @@ mod tests {
     fn test_process_renewals_batch_too_large_rejected() {
         let (env, client, _admin) = setup();
 
-        // Build a Vec of 31 addresses (over MAX_BATCH_SIZE of 30)
+        // Build a Vec of 31 addresses (over MAX_RENEWAL_BATCH_SIZE of 30)
         let mut addrs = soroban_sdk::vec![&env];
         for _ in 0..31 {
             addrs.push_back(Address::generate(&env));

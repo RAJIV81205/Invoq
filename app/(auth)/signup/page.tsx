@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SecretKeyModal from "@/app/components/SecretKeyModal";
+import { getApiError, getErrorMessage } from "@/app/lib/errors";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -26,12 +27,12 @@ export default function SignupPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data?.error ?? "Signup failed");
+        setError(getApiError(data, "Signup failed"));
         return;
       }
       setSecretKey(data.secretKey);
-    } catch (err: any) {
-      setError(err?.message ?? "Network error");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }

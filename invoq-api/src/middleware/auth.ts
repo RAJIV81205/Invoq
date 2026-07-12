@@ -5,11 +5,9 @@ import { createLogger } from "../lib/logger.js";
 
 const log = createLogger("auth");
 
-declare global {
-  namespace Express {
-    interface Locals {
-      auth: AuthResult;
-    }
+declare module "express-serve-static-core" {
+  interface Locals {
+    auth: AuthResult;
   }
 }
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/app/components/Modal";
 import SecretKeyModal from "@/app/components/SecretKeyModal";
+import { getApiError, getErrorMessage } from "@/app/lib/errors";
 
 const ALL_EVENTS = [
   "subscription.created",
@@ -41,13 +42,13 @@ export default function NewEndpointButton() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setErr(data?.error ?? "Failed to create endpoint");
+        setErr(getApiError(data, "Failed to create endpoint"));
         return;
       }
       setSecret(data.signingSecret);
       router.refresh();
-    } catch (e: any) {
-      setErr(e?.message ?? "Network error");
+    } catch (e: unknown) {
+      setErr(getErrorMessage(e));
     } finally {
       setBusy(false);
     }

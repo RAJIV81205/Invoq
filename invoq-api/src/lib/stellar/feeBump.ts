@@ -38,6 +38,7 @@ import {
   StrKey,
   BASE_FEE,
   Contract,
+  xdr,
 } from "@stellar/stellar-sdk";
 import { rpc as SorobanRpc } from "@stellar/stellar-sdk";
 import {
@@ -50,6 +51,7 @@ import {
   toScI128,
   toScStringVec,
 } from "./client.js";
+import { SPEND_POLICY_CONTRACT_ADDRESS } from "../../config.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -325,6 +327,112 @@ export async function buildReactivatePlanTxXdr(params: {
   } catch (err) {
     return { xdr: null, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+function toScAddressVec(addresses: string[]) {
+  return xdr.ScVal.scvVec(addresses.map((address) => toScAddress(address)));
+}
+
+async function buildSpendPolicyTx(params: {
+  ownerAddress: string;
+  method: string;
+  args: xdr.ScVal[];
+}): Promise<{ xdr: string | null; error: string | null }> {
+  const rpc        = getRpc();
+  const passphrase = getNetworkPassphrase();
+  const contractId = SPEND_POLICY_CONTRACT_ADDRESS;
+
+  if (!contractId) {
+    return { xdr: null, error: "SPEND_POLICY_CONTRACT_ADDRESS not configured" };
+  }
+
+  try {
+    let ownerAccount;
+    try {
+      ownerAccount = await rpc.getAccount(params.ownerAddress);
+    } catch {
+      return { xdr: null, error: "Policy owner Stellar account not found." };
+    }
+
+    const contract = new Contract(contractId);
+    const tx = new TransactionBuilder(ownerAccount, {
+      fee:               MIN_INCLUSION_FEE_STROOPS,
+      networkPassphrase: passphrase,
+    })
+      .addOperation(contract.call(params.method, ...params.args))
+      .setTimeout(300)
+      .build();
+
+    const simResult = await rpc.simulateTransaction(tx);
+    if (SorobanRpc.Api.isSimulationError(simResult)) {
+      return { xdr: null, error: `Transaction simulation failed: ${simResult.error}` };
+    }
+
+    const assembled = SorobanRpc.assembleTransaction(tx, simResult).build();
+    return { xdr: assembled.toXDR(), error: null };
+  } catch (err) {
+    return { xdr: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function buildSpendPolicyCreateTxXdr(params: {
+  ownerAddress: string;
+  dailyLimitUsdc: bigint;
+  txLimitUsdc: bigint;
+  allowlist: string[];
+  agents: string[];
+}): Promise<{ xdr: string | null; error: string | null }> {
+  return buildSpendPolicyTx({
+    ownerAddress: params.ownerAddress,
+    method:       "create_policy",
+    args: [
+      toScAddress(params.ownerAddress),
+      toScI128(params.dailyLimitUsdc),
+      toScI128(params.txLimitUsdc),
+      toScAddressVec(params.allowlist),
+      toScAddressVec(params.agents),
+    ],
+  });
+}
+
+export async function buildSpendPolicyUpdateTxXdr(params: {
+  ownerAddress: string;
+  dailyLimitUsdc: bigint;
+  txLimitUsdc: bigint;
+  allowlist: string[];
+  agents: string[];
+}): Promise<{ xdr: string | null; error: string | null }> {
+  return buildSpendPolicyTx({
+    ownerAddress: params.ownerAddress,
+    method:       "update_policy",
+    args: [
+      toScAddress(params.ownerAddress),
+      toScI128(params.dailyLimitUsdc),
+      toScI128(params.txLimitUsdc),
+      toScAddressVec(params.allowlist),
+      toScAddressVec(params.agents),
+    ],
+  });
+}
+
+export async function buildSpendPolicyDeactivateTxXdr(
+  ownerAddress: string
+): Promise<{ xdr: string | null; error: string | null }> {
+  return buildSpendPolicyTx({
+    ownerAddress,
+    method: "deactivate_policy",
+    args:   [toScAddress(ownerAddress)],
+  });
+}
+
+export async function buildSpendPolicyReactivateTxXdr(
+  ownerAddress: string
+): Promise<{ xdr: string | null; error: string | null }> {
+  return buildSpendPolicyTx({
+    ownerAddress,
+    method: "reactivate_policy",
+    args:   [toScAddress(ownerAddress)],
+  });
 }
 
 /**

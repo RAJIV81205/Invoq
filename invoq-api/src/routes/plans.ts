@@ -20,13 +20,13 @@ import { Router } from "express";
 import { authenticate } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/error.js";
 import {
-  createPlan,
   getPlan,
   getPlanCount,
   updatePlan,
   deactivatePlan,
   reactivatePlan,
 } from "../lib/stellar/registry.js";
+import { getAdminPublicKey } from "../lib/stellar/client.js";
 import { listSubscriptionCacheByDeveloperAddress } from "../lib/db/index.js";
 import {
   buildPlanTxXdr,
@@ -380,49 +380,6 @@ router.post(
   })
 );
 
-// ─── Admin-signed plan operations (server holds key) ─────────────────────────
-
-// POST /v1/plans
-router.post(
-  "/",
-  authenticate(),
-  asyncHandler(async (req, res) => {
-    const { developerAddress } = res.locals.auth;
-    const { name, priceUsdc, intervalSeconds, trialSeconds, usageLimit, features } = req.body;
-
-    if (!name || priceUsdc === undefined || !intervalSeconds) {
-      res.status(400).json({ error: "name, priceUsdc, intervalSeconds required" });
-      return;
-    }
-
-    const result = await createPlan({
-      owner:           developerAddress!,
-      name,
-      priceUsdc:       BigInt(priceUsdc),
-      intervalSeconds: BigInt(intervalSeconds),
-      trialSeconds:    BigInt(trialSeconds ?? 0),
-      usageLimit:      BigInt(usageLimit ?? 0),
-      features:        features ?? [],
-    });
-
-    if (result.error) {
-      console.error("[Plans] createPlan failed:", {
-        owner: developerAddress,
-        name,
-        error: result.error,
-        txHash: result.txHash,
-      });
-      res.status(502).json({ error: result.error });
-      return;
-    }
-
-    res.status(201).json({
-      planId: result.planId?.toString(),
-      txHash: result.txHash,
-    });
-  })
-);
-
 // ─── Plan-ID–scoped routes ────────────────────────────────────────────────────
 
 // GET /v1/plans/:planId
@@ -472,7 +429,7 @@ router.patch(
     }
 
     const result = await updatePlan({
-      caller:     developerAddress!,
+      caller:     getAdminPublicKey(),
       planId,
       name,
       priceUsdc:  BigInt(priceUsdc),
@@ -507,7 +464,7 @@ router.delete(
       return;
     }
 
-    const result = await deactivatePlan(developerAddress!, planId);
+    const result = await deactivatePlan(getAdminPublicKey(), planId);
 
     if (result.error) {
       res.status(502).json({ error: result.error });
@@ -536,7 +493,7 @@ router.post(
       return;
     }
 
-    const result = await reactivatePlan(developerAddress!, planId);
+    const result = await reactivatePlan(getAdminPublicKey(), planId);
 
     if (result.error) {
       res.status(502).json({ error: result.error });

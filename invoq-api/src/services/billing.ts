@@ -113,7 +113,8 @@ export async function runRenewalCycle(): Promise<void> {
         },
       });
 
-      succeeded ? renewed++ : failed++;
+      if (succeeded) renewed++;
+      else failed++;
     }
   }
 

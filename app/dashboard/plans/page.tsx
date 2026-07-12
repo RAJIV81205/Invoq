@@ -3,6 +3,7 @@ import EmptyState from "@/app/components/EmptyState";
 import StatusPill from "@/app/components/StatusPill";
 import Link from "next/link";
 import NewPlanButton from "./NewPlanButton";
+import type { DashboardPlan } from "@/app/lib/types";
 
 const STROOPS_PER_USDC = 10_000_000;
 
@@ -22,7 +23,7 @@ export default async function PlansPage() {
   const session = await requireSession();
   const res = await apiFetch(session, "/v1/plans");
   const data = res.ok ? await res.json() : { plans: [] };
-  const plans: any[] = data.plans ?? [];
+  const plans: DashboardPlan[] = data.plans ?? [];
 
   return (
     <div className="space-y-6">

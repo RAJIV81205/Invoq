@@ -194,7 +194,7 @@ router.delete(
       res.status(404).json({ error: "No subscription found for this address" });
       return;
     }
-    const immediate = req.body?.immediate === true;
+    const immediate = req.body?.immediate === true || req.query.immediate === "true";
 
     const caller = getAdminPublicKey();
     const result = await cancelSubscription({

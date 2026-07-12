@@ -65,16 +65,15 @@
 //! - `get_usdc_sac`      — public, read-only
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, contractevent,
-    Address, Env, Symbol, IntoVal,
-    panic_with_error, log,
+    contract, contracterror, contractevent, contractimpl, contracttype, log, panic_with_error,
+    Address, Env, IntoVal, Symbol,
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const LEDGERS_PER_YEAR: u32     = 6_307_200;
+const LEDGERS_PER_YEAR: u32 = 6_307_200;
 const PERSISTENT_TTL_THRESHOLD: u32 = LEDGERS_PER_YEAR;
-const PERSISTENT_TTL_BUMP:      u32 = LEDGERS_PER_YEAR;
+const PERSISTENT_TTL_BUMP: u32 = LEDGERS_PER_YEAR;
 
 /// Minimum deposit / top-up: 0.10 USDC = 1_000_000 stroops
 /// Prevents dust deposits that waste storage
@@ -87,22 +86,22 @@ const MIN_DEPOSIT_STROOPS: i128 = 1_000_000;
 #[repr(u32)]
 pub enum Error {
     // Initialisation
-    AlreadyInitialized        = 1,
-    NotInitialized            = 2,
+    AlreadyInitialized = 1,
+    NotInitialized = 2,
 
     // Auth
-    Unauthorized              = 10,
+    Unauthorized = 10,
 
     // Vault lifecycle
-    VaultAlreadyExists        = 20,
-    VaultNotFound             = 21,
+    VaultAlreadyExists = 20,
+    VaultNotFound = 21,
 
     // Financial
-    DepositTooSmall           = 30,
-    InsufficientVaultBalance  = 31,
-    InvalidAmount             = 32,
-    PaymentFailed             = 33,
-    InvalidThreshold          = 34,
+    DepositTooSmall = 30,
+    InsufficientVaultBalance = 31,
+    InvalidAmount = 32,
+    PaymentFailed = 33,
+    InvalidThreshold = 34,
 }
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
@@ -164,71 +163,89 @@ pub struct VaultRecord {
 
 #[contractevent]
 pub struct VaultCreated {
-    #[topic] pub customer:  Address,
-    #[topic] pub developer: Address,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub developer: Address,
     pub initial_balance: i128,
 }
 
 #[contractevent]
 pub struct VaultDeposited {
-    #[topic] pub customer:    Address,
-    #[topic] pub developer:   Address,
-    pub amount:       i128,
-    pub new_balance:  i128,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub developer: Address,
+    pub amount: i128,
+    pub new_balance: i128,
 }
 
 #[contractevent]
 pub struct VaultDebited {
-    #[topic] pub customer:        Address,
-    #[topic] pub developer:       Address,
-    pub amount:           i128,
-    pub new_balance:      i128,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub developer: Address,
+    pub amount: i128,
+    pub new_balance: i128,
     pub usage_description: soroban_sdk::String,
 }
 
 #[contractevent]
 pub struct VaultWithdrawn {
-    #[topic] pub customer:   Address,
-    #[topic] pub developer:  Address,
-    pub amount:      i128,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub developer: Address,
+    pub amount: i128,
     pub new_balance: i128,
 }
 
 #[contractevent]
 pub struct VaultClosed {
-    #[topic] pub customer:  Address,
-    #[topic] pub developer: Address,
-    pub refunded:   i128,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub developer: Address,
+    pub refunded: i128,
 }
 
 #[contractevent]
 pub struct VaultLowBalance {
-    #[topic] pub customer:   Address,
-    #[topic] pub developer:  Address,
-    pub balance:     i128,
-    pub threshold:   i128,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub developer: Address,
+    pub balance: i128,
+    pub threshold: i128,
 }
 
 #[contractevent]
 pub struct VaultBalanceRestored {
-    #[topic] pub customer:  Address,
-    #[topic] pub developer: Address,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub developer: Address,
     pub new_balance: i128,
 }
 
 #[contractevent]
 pub struct VaultThresholdUpdated {
-    #[topic] pub customer:             Address,
-    #[topic] pub developer:            Address,
-    pub new_threshold:         i128,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub developer: Address,
+    pub new_threshold: i128,
     pub new_auto_topup_amount: i128,
 }
 
 #[contractevent]
 pub struct AutoTopUpExecuted {
-    #[topic] pub customer:   Address,
-    #[topic] pub developer:  Address,
-    pub amount:      i128,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub developer: Address,
+    pub amount: i128,
     pub new_balance: i128,
 }
 
@@ -285,10 +302,7 @@ fn load_vault(env: &Env, customer: &Address, developer: &Address) -> VaultRecord
 
 fn try_load_vault(env: &Env, customer: &Address, developer: &Address) -> Option<VaultRecord> {
     let key = vault_key(customer, developer);
-    let result = env
-        .storage()
-        .persistent()
-        .get::<DataKey, VaultRecord>(&key);
+    let result = env.storage().persistent().get::<DataKey, VaultRecord>(&key);
     if result.is_some() {
         env.storage()
             .persistent()
@@ -326,12 +340,7 @@ fn load_usdc_sac(env: &Env) -> Address {
 ///
 /// Uses SAC `transfer` — the customer must sign this transaction.
 /// `from` is the transaction signer so Soroban's auth engine handles it.
-fn sac_transfer_in(
-    env: &Env,
-    usdc_sac: &Address,
-    from: &Address,
-    amount: i128,
-) -> bool {
+fn sac_transfer_in(env: &Env, usdc_sac: &Address, from: &Address, amount: i128) -> bool {
     let contract = env.current_contract_address();
     let result = env.try_invoke_contract::<(), soroban_sdk::Error>(
         usdc_sac,
@@ -350,12 +359,7 @@ fn sac_transfer_in(
 ///
 /// Uses SAC `transfer` — this contract is the sender, no customer auth needed.
 /// The contract itself authorises this transfer via Soroban's contract auth context.
-fn sac_transfer_out(
-    env: &Env,
-    usdc_sac: &Address,
-    to: &Address,
-    amount: i128,
-) -> bool {
+fn sac_transfer_out(env: &Env, usdc_sac: &Address, to: &Address, amount: i128) -> bool {
     let contract = env.current_contract_address();
     let result = env.try_invoke_contract::<(), soroban_sdk::Error>(
         usdc_sac,
@@ -376,11 +380,7 @@ fn sac_transfer_out(
 /// Customer must have pre-approved this contract as a spender.
 /// Returns true if top-up succeeded, false if it failed (no allowance, etc.).
 /// Failure is silent — auto top-up failing does NOT block the triggering debit.
-fn try_auto_topup(
-    env: &Env,
-    usdc_sac: &Address,
-    vault: &mut VaultRecord,
-) -> bool {
+fn try_auto_topup(env: &Env, usdc_sac: &Address, vault: &mut VaultRecord) -> bool {
     if vault.auto_topup_amount <= 0 {
         return false;
     }
@@ -391,15 +391,15 @@ fn try_auto_topup(
         &Symbol::new(env, "transfer_from"),
         soroban_sdk::vec![
             env,
-            contract.into_val(env),          // spender = this contract
-            vault.customer.into_val(env),    // from = customer
-            contract.into_val(env),          // to = this contract (vault)
+            contract.into_val(env),       // spender = this contract
+            vault.customer.into_val(env), // from = customer
+            contract.into_val(env),       // to = this contract (vault)
             vault.auto_topup_amount.into_val(env),
         ],
     );
 
     if matches!(result, Ok(Ok(_))) {
-        let amount         = vault.auto_topup_amount;
+        let amount = vault.auto_topup_amount;
         vault.balance_usdc = vault.balance_usdc.saturating_add(amount);
         vault.total_deposited = vault.total_deposited.saturating_add(amount);
         true
@@ -415,7 +415,6 @@ pub struct EscrowVault;
 
 #[contractimpl]
 impl EscrowVault {
-
     // ═════════════════════════════════════════════════════════════════════════
     // INITIALISATION
     // ═════════════════════════════════════════════════════════════════════════
@@ -432,7 +431,7 @@ impl EscrowVault {
         if env.storage().instance().has(&DataKey::Admin) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
-        env.storage().instance().set(&DataKey::Admin,   &admin);
+        env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::UsdcSac, &usdc_sac);
         log!(&env, "EscrowVault initialized. admin={}", admin);
     }
@@ -512,29 +511,29 @@ impl EscrowVault {
         let now = env.ledger().timestamp();
 
         let vault = VaultRecord {
-            customer:              customer.clone(),
-            developer:             developer.clone(),
-            balance_usdc:          initial_deposit,
-            total_deposited:       initial_deposit,
-            total_debited:         0,
+            customer: customer.clone(),
+            developer: developer.clone(),
+            balance_usdc: initial_deposit,
+            total_deposited: initial_deposit,
+            total_debited: 0,
             low_balance_threshold: low_balance_threshold.max(0),
-            auto_topup_amount:     auto_topup_amount.max(0),
-            created_at:            now,
+            auto_topup_amount: auto_topup_amount.max(0),
+            created_at: now,
         };
 
         store_vault(&env, &vault);
 
         VaultCreated {
-            customer:        customer.clone(),
-            developer:       developer.clone(),
+            customer: customer.clone(),
+            developer: developer.clone(),
             initial_balance: initial_deposit,
         }
         .publish(&env);
 
         VaultDeposited {
-            customer:    customer,
-            developer:   developer,
-            amount:      initial_deposit,
+            customer: customer,
+            developer: developer,
+            amount: initial_deposit,
             new_balance: initial_deposit,
         }
         .publish(&env);
@@ -571,8 +570,8 @@ impl EscrowVault {
         }
 
         let mut vault = load_vault(&env, &customer, &developer);
-        let was_below_threshold = vault.low_balance_threshold > 0
-            && vault.balance_usdc < vault.low_balance_threshold;
+        let was_below_threshold =
+            vault.low_balance_threshold > 0 && vault.balance_usdc < vault.low_balance_threshold;
 
         let usdc_sac = load_usdc_sac(&env);
         let ok = sac_transfer_in(&env, &usdc_sac, &customer, amount);
@@ -580,15 +579,15 @@ impl EscrowVault {
             panic_with_error!(&env, Error::PaymentFailed);
         }
 
-        vault.balance_usdc    = vault.balance_usdc.saturating_add(amount);
+        vault.balance_usdc = vault.balance_usdc.saturating_add(amount);
         vault.total_deposited = vault.total_deposited.saturating_add(amount);
         let new_balance = vault.balance_usdc;
 
         store_vault(&env, &vault);
 
         VaultDeposited {
-            customer:    customer.clone(),
-            developer:   developer.clone(),
+            customer: customer.clone(),
+            developer: developer.clone(),
             amount,
             new_balance,
         }
@@ -600,8 +599,8 @@ impl EscrowVault {
             && new_balance >= vault.low_balance_threshold
         {
             VaultBalanceRestored {
-                customer:    customer,
-                developer:   developer,
+                customer: customer,
+                developer: developer,
                 new_balance,
             }
             .publish(&env);
@@ -674,25 +673,25 @@ impl EscrowVault {
         }
 
         // Update state after confirmed transfer
-        vault.balance_usdc  = vault.balance_usdc.saturating_sub(amount);
+        vault.balance_usdc = vault.balance_usdc.saturating_sub(amount);
         vault.total_debited = vault.total_debited.saturating_add(amount);
         let new_balance = vault.balance_usdc;
 
         // Check if auto top-up should trigger BEFORE storing,
         // so the store captures the updated balance if top-up succeeds
-        let threshold_breached = vault.low_balance_threshold > 0
-            && new_balance < vault.low_balance_threshold;
+        let threshold_breached =
+            vault.low_balance_threshold > 0 && new_balance < vault.low_balance_threshold;
 
         if threshold_breached && vault.auto_topup_amount > 0 {
             // Attempt auto top-up — updates vault.balance_usdc in-place if successful
             let topup_amount = vault.auto_topup_amount;
-            let succeeded    = try_auto_topup(&env, &usdc_sac, &mut vault);
+            let succeeded = try_auto_topup(&env, &usdc_sac, &mut vault);
 
             if succeeded {
                 AutoTopUpExecuted {
-                    customer:    customer.clone(),
-                    developer:   developer.clone(),
-                    amount:      topup_amount,
+                    customer: customer.clone(),
+                    developer: developer.clone(),
+                    amount: topup_amount,
                     new_balance: vault.balance_usdc,
                 }
                 .publish(&env);
@@ -704,10 +703,10 @@ impl EscrowVault {
 
         // Emit debit event (always, regardless of top-up result)
         VaultDebited {
-            customer:          customer.clone(),
-            developer:         developer.clone(),
+            customer: customer.clone(),
+            developer: developer.clone(),
             amount,
-            new_balance,      // the balance AFTER debit, BEFORE any top-up
+            new_balance, // the balance AFTER debit, BEFORE any top-up
             usage_description,
         }
         .publish(&env);
@@ -716,9 +715,9 @@ impl EscrowVault {
         // (emit after debit event so listeners see the debit first)
         if threshold_breached {
             VaultLowBalance {
-                customer:  customer,
+                customer: customer,
                 developer: developer,
-                balance:   new_balance,
+                balance: new_balance,
                 threshold: vault.low_balance_threshold,
             }
             .publish(&env);
@@ -772,13 +771,13 @@ impl EscrowVault {
         }
 
         vault.balance_usdc = vault.balance_usdc.saturating_sub(amount);
-        let new_balance    = vault.balance_usdc;
+        let new_balance = vault.balance_usdc;
 
         store_vault(&env, &vault);
 
         VaultWithdrawn {
-            customer:    customer,
-            developer:   developer,
+            customer: customer,
+            developer: developer,
             amount,
             new_balance,
         }
@@ -796,12 +795,7 @@ impl EscrowVault {
     ///
     /// # Returns
     /// Amount refunded to the customer (0 if vault was already empty).
-    pub fn close_vault(
-        env: Env,
-        caller: Address,
-        customer: Address,
-        developer: Address,
-    ) -> i128 {
+    pub fn close_vault(env: Env, caller: Address, customer: Address, developer: Address) -> i128 {
         require_customer_or_admin(&env, &caller, &customer);
 
         let vault = load_vault(&env, &customer, &developer);
@@ -820,9 +814,9 @@ impl EscrowVault {
         remove_vault(&env, &customer, &developer);
 
         VaultClosed {
-            customer:  customer,
+            customer: customer,
             developer: developer,
-            refunded:  refund,
+            refunded: refund,
         }
         .publish(&env);
 
@@ -860,13 +854,13 @@ impl EscrowVault {
 
         let mut vault = load_vault(&env, &customer, &developer);
         vault.low_balance_threshold = new_threshold;
-        vault.auto_topup_amount     = new_auto_topup;
+        vault.auto_topup_amount = new_auto_topup;
 
         store_vault(&env, &vault);
 
         VaultThresholdUpdated {
-            customer:              customer,
-            developer:             developer,
+            customer: customer,
+            developer: developer,
             new_threshold,
             new_auto_topup_amount: new_auto_topup,
         }
@@ -878,29 +872,17 @@ impl EscrowVault {
     // ═════════════════════════════════════════════════════════════════════════
 
     /// Returns the full VaultRecord for a (customer, developer) pair, or None.
-    pub fn get_vault(
-        env: Env,
-        customer: Address,
-        developer: Address,
-    ) -> Option<VaultRecord> {
+    pub fn get_vault(env: Env, customer: Address, developer: Address) -> Option<VaultRecord> {
         try_load_vault(&env, &customer, &developer)
     }
 
     /// Returns whether a vault exists for the given pair.
-    pub fn vault_exists(
-        env: Env,
-        customer: Address,
-        developer: Address,
-    ) -> bool {
+    pub fn vault_exists(env: Env, customer: Address, developer: Address) -> bool {
         try_load_vault(&env, &customer, &developer).is_some()
     }
 
     /// Returns the current USDC balance for a vault, or 0 if not found.
-    pub fn get_balance(
-        env: Env,
-        customer: Address,
-        developer: Address,
-    ) -> i128 {
+    pub fn get_balance(env: Env, customer: Address, developer: Address) -> i128 {
         try_load_vault(&env, &customer, &developer)
             .map(|v| v.balance_usdc)
             .unwrap_or(0)
@@ -914,17 +896,18 @@ mod tests {
     use super::*;
     use soroban_sdk::{
         testutils::{Address as _, Ledger, LedgerInfo},
+        token::StellarAssetClient,
         Env, String,
     };
 
     // ── Setup helpers ─────────────────────────────────────────────────────────
 
     struct TestCtx {
-        env:       Env,
-        client:    EscrowVaultClient<'static>,
-        admin:     Address,
-        usdc_sac:  Address,
-        customer:  Address,
+        env: Env,
+        client: EscrowVaultClient<'static>,
+        admin: Address,
+        usdc_sac: Address,
+        customer: Address,
         developer: Address,
     }
 
@@ -934,26 +917,37 @@ mod tests {
 
         // Set a realistic ledger timestamp so day_number calculations work
         env.ledger().set(LedgerInfo {
-            timestamp:          1_700_000_000,
-            protocol_version:   22,
-            sequence_number:    1,
-            network_id:         Default::default(),
-            base_reserve:       10,
+            timestamp: 1_700_000_000,
+            protocol_version: 25,
+            sequence_number: 1,
+            network_id: Default::default(),
+            base_reserve: 10,
             min_temp_entry_ttl: 1,
             min_persistent_entry_ttl: 1,
-            max_entry_ttl:      LEDGERS_PER_YEAR * 2,
+            max_entry_ttl: LEDGERS_PER_YEAR * 2,
         });
 
-        let contract_id = env.register_contract(None, EscrowVault);
-        let client      = EscrowVaultClient::new(&env, &contract_id);
-        let admin       = Address::generate(&env);
-        let usdc_sac    = Address::generate(&env);
-        let customer    = Address::generate(&env);
-        let developer   = Address::generate(&env);
+        let admin = Address::generate(&env);
+        let customer = Address::generate(&env);
+        let developer = Address::generate(&env);
+        let sac = env.register_stellar_asset_contract_v2(admin.clone());
+        let usdc_sac = sac.address();
+        let token = StellarAssetClient::new(&env, &usdc_sac);
+        token.mint(&customer, &1_000_000_000_000i128);
+
+        let contract_id = env.register(EscrowVault, ());
+        let client = EscrowVaultClient::new(&env, &contract_id);
 
         client.initialize(&admin, &usdc_sac);
 
-        TestCtx { env, client, admin, usdc_sac, customer, developer }
+        TestCtx {
+            env,
+            client,
+            admin,
+            usdc_sac,
+            customer,
+            developer,
+        }
     }
 
     fn desc(env: &Env, s: &str) -> String {
@@ -965,7 +959,10 @@ mod tests {
     #[test]
     fn test_init_once() {
         let ctx = setup();
-        assert!(ctx.client.try_initialize(&ctx.admin, &ctx.usdc_sac).is_err());
+        assert!(ctx
+            .client
+            .try_initialize(&ctx.admin, &ctx.usdc_sac)
+            .is_err());
     }
 
     #[test]
@@ -989,15 +986,15 @@ mod tests {
             &ctx.customer,
             &ctx.customer,
             &ctx.developer,
-            &50_000_000i128,   // 5 USDC
-            &10_000_000i128,   // 1 USDC threshold
-            &0i128,            // no auto top-up
+            &50_000_000i128, // 5 USDC
+            &10_000_000i128, // 1 USDC threshold
+            &0i128,          // no auto top-up
         );
-        assert_eq!(vault.customer,        ctx.customer);
-        assert_eq!(vault.developer,       ctx.developer);
-        assert_eq!(vault.balance_usdc,    50_000_000i128);
+        assert_eq!(vault.customer, ctx.customer);
+        assert_eq!(vault.developer, ctx.developer);
+        assert_eq!(vault.balance_usdc, 50_000_000i128);
         assert_eq!(vault.total_deposited, 50_000_000i128);
-        assert_eq!(vault.total_debited,   0i128);
+        assert_eq!(vault.total_debited, 0i128);
         assert!(vault.created_at > 0);
     }
 
@@ -1005,23 +1002,40 @@ mod tests {
     fn test_create_vault_duplicate_rejected() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &10_000_000i128,
+            &0i128,
+            &0i128,
         );
-        assert!(ctx.client.try_create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &0i128, &0i128,
-        ).is_err());
+        assert!(ctx
+            .client
+            .try_create_vault(
+                &ctx.customer,
+                &ctx.customer,
+                &ctx.developer,
+                &10_000_000i128,
+                &0i128,
+                &0i128,
+            )
+            .is_err());
     }
 
     #[test]
     fn test_create_vault_deposit_too_small_rejected() {
         let ctx = setup();
-        assert!(ctx.client.try_create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &500_000i128, // below 1_000_000 minimum
-            &0i128, &0i128,
-        ).is_err());
+        assert!(ctx
+            .client
+            .try_create_vault(
+                &ctx.customer,
+                &ctx.customer,
+                &ctx.developer,
+                &500_000i128, // below 1_000_000 minimum
+                &0i128,
+                &0i128,
+            )
+            .is_err());
     }
 
     #[test]
@@ -1029,8 +1043,12 @@ mod tests {
         let ctx = setup();
         assert!(!ctx.client.vault_exists(&ctx.customer, &ctx.developer));
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &10_000_000i128,
+            &0i128,
+            &0i128,
         );
         assert!(ctx.client.vault_exists(&ctx.customer, &ctx.developer));
     }
@@ -1041,17 +1059,24 @@ mod tests {
     fn test_deposit_increases_balance() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &50_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &50_000_000i128,
+            &0i128,
+            &0i128,
         );
 
         let new_balance = ctx.client.deposit(
-            &ctx.customer, &ctx.customer, &ctx.developer, &20_000_000i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &20_000_000i128,
         );
         assert_eq!(new_balance, 70_000_000i128);
 
         let vault = ctx.client.get_vault(&ctx.customer, &ctx.developer).unwrap();
-        assert_eq!(vault.balance_usdc,    70_000_000i128);
+        assert_eq!(vault.balance_usdc, 70_000_000i128);
         assert_eq!(vault.total_deposited, 70_000_000i128);
     }
 
@@ -1059,21 +1084,27 @@ mod tests {
     fn test_deposit_too_small_rejected() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &10_000_000i128,
+            &0i128,
+            &0i128,
         );
-        assert!(ctx.client.try_deposit(
-            &ctx.customer, &ctx.customer, &ctx.developer, &500_000i128,
-        ).is_err());
+        assert!(ctx
+            .client
+            .try_deposit(&ctx.customer, &ctx.customer, &ctx.developer, &500_000i128,)
+            .is_err());
     }
 
     #[test]
     fn test_deposit_to_nonexistent_vault_rejected() {
-        let ctx     = setup();
-        let other   = Address::generate(&ctx.env);
-        assert!(ctx.client.try_deposit(
-            &ctx.customer, &ctx.customer, &other, &10_000_000i128,
-        ).is_err());
+        let ctx = setup();
+        let other = Address::generate(&ctx.env);
+        assert!(ctx
+            .client
+            .try_deposit(&ctx.customer, &ctx.customer, &other, &10_000_000i128,)
+            .is_err());
     }
 
     // ── debit_vault ───────────────────────────────────────────────────────────
@@ -1082,19 +1113,25 @@ mod tests {
     fn test_debit_decreases_balance_and_tracks_total() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &100_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &100_000_000i128,
+            &0i128,
+            &0i128,
         );
 
         let after = ctx.client.debit_vault(
-            &ctx.admin, &ctx.customer, &ctx.developer,
+            &ctx.admin,
+            &ctx.customer,
+            &ctx.developer,
             &30_000_000i128,
             &desc(&ctx.env, "300 API calls"),
         );
         assert_eq!(after, 70_000_000i128);
 
         let vault = ctx.client.get_vault(&ctx.customer, &ctx.developer).unwrap();
-        assert_eq!(vault.balance_usdc,  70_000_000i128);
+        assert_eq!(vault.balance_usdc, 70_000_000i128);
         assert_eq!(vault.total_debited, 30_000_000i128);
     }
 
@@ -1102,60 +1139,108 @@ mod tests {
     fn test_debit_zero_rejected() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &50_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &50_000_000i128,
+            &0i128,
+            &0i128,
         );
-        assert!(ctx.client.try_debit_vault(
-            &ctx.admin, &ctx.customer, &ctx.developer,
-            &0i128, &desc(&ctx.env, "zero"),
-        ).is_err());
+        assert!(ctx
+            .client
+            .try_debit_vault(
+                &ctx.admin,
+                &ctx.customer,
+                &ctx.developer,
+                &0i128,
+                &desc(&ctx.env, "zero"),
+            )
+            .is_err());
     }
 
     #[test]
     fn test_debit_over_balance_rejected() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &10_000_000i128,
+            &0i128,
+            &0i128,
         );
-        assert!(ctx.client.try_debit_vault(
-            &ctx.admin, &ctx.customer, &ctx.developer,
-            &20_000_000i128,  // more than balance
-            &desc(&ctx.env, "over"),
-        ).is_err());
+        assert!(ctx
+            .client
+            .try_debit_vault(
+                &ctx.admin,
+                &ctx.customer,
+                &ctx.developer,
+                &20_000_000i128, // more than balance
+                &desc(&ctx.env, "over"),
+            )
+            .is_err());
     }
 
     #[test]
     fn test_debit_by_non_admin_rejected() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &50_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &50_000_000i128,
+            &0i128,
+            &0i128,
         );
         // customer tries to call debit — must fail
-        assert!(ctx.client.try_debit_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &desc(&ctx.env, "hack"),
-        ).is_err());
+        assert!(ctx
+            .client
+            .try_debit_vault(
+                &ctx.customer,
+                &ctx.customer,
+                &ctx.developer,
+                &10_000_000i128,
+                &desc(&ctx.env, "hack"),
+            )
+            .is_err());
     }
 
     #[test]
     fn test_sequential_debits_track_correctly() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &100_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &100_000_000i128,
+            &0i128,
+            &0i128,
         );
 
-        ctx.client.debit_vault(&ctx.admin, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &desc(&ctx.env, "batch 1"));
-        ctx.client.debit_vault(&ctx.admin, &ctx.customer, &ctx.developer,
-            &25_000_000i128, &desc(&ctx.env, "batch 2"));
-        ctx.client.debit_vault(&ctx.admin, &ctx.customer, &ctx.developer,
-            &15_000_000i128, &desc(&ctx.env, "batch 3"));
+        ctx.client.debit_vault(
+            &ctx.admin,
+            &ctx.customer,
+            &ctx.developer,
+            &10_000_000i128,
+            &desc(&ctx.env, "batch 1"),
+        );
+        ctx.client.debit_vault(
+            &ctx.admin,
+            &ctx.customer,
+            &ctx.developer,
+            &25_000_000i128,
+            &desc(&ctx.env, "batch 2"),
+        );
+        ctx.client.debit_vault(
+            &ctx.admin,
+            &ctx.customer,
+            &ctx.developer,
+            &15_000_000i128,
+            &desc(&ctx.env, "batch 3"),
+        );
 
         let vault = ctx.client.get_vault(&ctx.customer, &ctx.developer).unwrap();
-        assert_eq!(vault.balance_usdc,  50_000_000i128);
+        assert_eq!(vault.balance_usdc, 50_000_000i128);
         assert_eq!(vault.total_debited, 50_000_000i128);
     }
 
@@ -1165,12 +1250,19 @@ mod tests {
     fn test_withdraw_decreases_balance() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &100_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &100_000_000i128,
+            &0i128,
+            &0i128,
         );
 
         let after = ctx.client.withdraw(
-            &ctx.customer, &ctx.customer, &ctx.developer, &40_000_000i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &40_000_000i128,
         );
         assert_eq!(after, 60_000_000i128);
 
@@ -1182,12 +1274,19 @@ mod tests {
     fn test_withdraw_full_balance() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &50_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &50_000_000i128,
+            &0i128,
+            &0i128,
         );
 
         let after = ctx.client.withdraw(
-            &ctx.customer, &ctx.customer, &ctx.developer, &50_000_000i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &50_000_000i128,
         );
         assert_eq!(after, 0i128);
     }
@@ -1196,25 +1295,40 @@ mod tests {
     fn test_withdraw_over_balance_rejected() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &10_000_000i128,
+            &0i128,
+            &0i128,
         );
-        assert!(ctx.client.try_withdraw(
-            &ctx.customer, &ctx.customer, &ctx.developer, &20_000_000i128,
-        ).is_err());
+        assert!(ctx
+            .client
+            .try_withdraw(
+                &ctx.customer,
+                &ctx.customer,
+                &ctx.developer,
+                &20_000_000i128,
+            )
+            .is_err());
     }
 
     #[test]
     fn test_withdraw_by_non_owner_rejected() {
-        let ctx      = setup();
+        let ctx = setup();
         let attacker = Address::generate(&ctx.env);
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &50_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &50_000_000i128,
+            &0i128,
+            &0i128,
         );
-        assert!(ctx.client.try_withdraw(
-            &attacker, &ctx.customer, &ctx.developer, &10_000_000i128,
-        ).is_err());
+        assert!(ctx
+            .client
+            .try_withdraw(&attacker, &ctx.customer, &ctx.developer, &10_000_000i128,)
+            .is_err());
     }
 
     // ── close_vault ───────────────────────────────────────────────────────────
@@ -1223,11 +1337,17 @@ mod tests {
     fn test_close_vault_refunds_balance() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &80_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &80_000_000i128,
+            &0i128,
+            &0i128,
         );
 
-        let refunded = ctx.client.close_vault(&ctx.customer, &ctx.customer, &ctx.developer);
+        let refunded = ctx
+            .client
+            .close_vault(&ctx.customer, &ctx.customer, &ctx.developer);
         assert_eq!(refunded, 80_000_000i128);
         assert!(!ctx.client.vault_exists(&ctx.customer, &ctx.developer));
     }
@@ -1236,15 +1356,24 @@ mod tests {
     fn test_close_empty_vault_returns_zero() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &10_000_000i128,
+            &0i128,
+            &0i128,
         );
         // Withdraw everything first
         ctx.client.withdraw(
-            &ctx.customer, &ctx.customer, &ctx.developer, &10_000_000i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &10_000_000i128,
         );
 
-        let refunded = ctx.client.close_vault(&ctx.customer, &ctx.customer, &ctx.developer);
+        let refunded = ctx
+            .client
+            .close_vault(&ctx.customer, &ctx.customer, &ctx.developer);
         assert_eq!(refunded, 0i128);
         assert!(!ctx.client.vault_exists(&ctx.customer, &ctx.developer));
     }
@@ -1253,11 +1382,17 @@ mod tests {
     fn test_close_vault_by_admin() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &20_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &20_000_000i128,
+            &0i128,
+            &0i128,
         );
         // Admin closes on behalf of customer
-        let refunded = ctx.client.close_vault(&ctx.admin, &ctx.customer, &ctx.developer);
+        let refunded = ctx
+            .client
+            .close_vault(&ctx.admin, &ctx.customer, &ctx.developer);
         assert_eq!(refunded, 20_000_000i128);
     }
 
@@ -1265,15 +1400,24 @@ mod tests {
     fn test_close_vault_then_recreate() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &10_000_000i128,
+            &0i128,
+            &0i128,
         );
-        ctx.client.close_vault(&ctx.customer, &ctx.customer, &ctx.developer);
+        ctx.client
+            .close_vault(&ctx.customer, &ctx.customer, &ctx.developer);
 
         // Should be able to create a fresh vault after closing
         let vault = ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &20_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &20_000_000i128,
+            &0i128,
+            &0i128,
         );
         assert_eq!(vault.balance_usdc, 20_000_000i128);
         assert_eq!(vault.total_deposited, 20_000_000i128);
@@ -1286,34 +1430,48 @@ mod tests {
     fn test_update_threshold_changes_values() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
             &50_000_000i128,
-            &DEFAULT_THRESHOLD_STROOPS,
+            &10_000_000i128,
             &0i128,
         );
 
         ctx.client.update_threshold(
-            &ctx.customer, &ctx.customer, &ctx.developer,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
             &20_000_000i128, // new threshold
             &50_000_000i128, // enable auto top-up
         );
 
         let vault = ctx.client.get_vault(&ctx.customer, &ctx.developer).unwrap();
         assert_eq!(vault.low_balance_threshold, 20_000_000i128);
-        assert_eq!(vault.auto_topup_amount,     50_000_000i128);
+        assert_eq!(vault.auto_topup_amount, 50_000_000i128);
     }
 
     #[test]
     fn test_update_threshold_negative_rejected() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &50_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &50_000_000i128,
+            &0i128,
+            &0i128,
         );
-        assert!(ctx.client.try_update_threshold(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &-1i128, &0i128,
-        ).is_err());
+        assert!(ctx
+            .client
+            .try_update_threshold(
+                &ctx.customer,
+                &ctx.customer,
+                &ctx.developer,
+                &-1i128,
+                &0i128,
+            )
+            .is_err());
     }
 
     // ── get_balance ───────────────────────────────────────────────────────────
@@ -1324,61 +1482,104 @@ mod tests {
         assert_eq!(ctx.client.get_balance(&ctx.customer, &ctx.developer), 0i128);
 
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &75_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &75_000_000i128,
+            &0i128,
+            &0i128,
         );
-        assert_eq!(ctx.client.get_balance(&ctx.customer, &ctx.developer), 75_000_000i128);
+        assert_eq!(
+            ctx.client.get_balance(&ctx.customer, &ctx.developer),
+            75_000_000i128
+        );
     }
 
     // ── multiple vaults ───────────────────────────────────────────────────────
 
     #[test]
     fn test_one_customer_multiple_developers() {
-        let ctx  = setup();
+        let ctx = setup();
         let dev2 = Address::generate(&ctx.env);
 
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &30_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &30_000_000i128,
+            &0i128,
+            &0i128,
         );
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &dev2,
-            &50_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &dev2,
+            &50_000_000i128,
+            &0i128,
+            &0i128,
         );
 
-        assert_eq!(ctx.client.get_balance(&ctx.customer, &ctx.developer), 30_000_000i128);
-        assert_eq!(ctx.client.get_balance(&ctx.customer, &dev2),          50_000_000i128);
+        assert_eq!(
+            ctx.client.get_balance(&ctx.customer, &ctx.developer),
+            30_000_000i128
+        );
+        assert_eq!(ctx.client.get_balance(&ctx.customer, &dev2), 50_000_000i128);
 
         // Debit from dev1's vault should not affect dev2's vault
         ctx.client.debit_vault(
-            &ctx.admin, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &desc(&ctx.env, "api"),
+            &ctx.admin,
+            &ctx.customer,
+            &ctx.developer,
+            &10_000_000i128,
+            &desc(&ctx.env, "api"),
         );
-        assert_eq!(ctx.client.get_balance(&ctx.customer, &ctx.developer), 20_000_000i128);
-        assert_eq!(ctx.client.get_balance(&ctx.customer, &dev2),          50_000_000i128);
+        assert_eq!(
+            ctx.client.get_balance(&ctx.customer, &ctx.developer),
+            20_000_000i128
+        );
+        assert_eq!(ctx.client.get_balance(&ctx.customer, &dev2), 50_000_000i128);
     }
 
     #[test]
     fn test_one_developer_multiple_customers() {
-        let ctx   = setup();
+        let ctx = setup();
         let cust2 = Address::generate(&ctx.env);
+        let token = StellarAssetClient::new(&ctx.env, &ctx.usdc_sac);
+        token.mint(&cust2, &1_000_000_000_000i128);
 
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &40_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &40_000_000i128,
+            &0i128,
+            &0i128,
         );
         ctx.client.create_vault(
-            &cust2, &cust2, &ctx.developer,
-            &60_000_000i128, &0i128, &0i128,
+            &cust2,
+            &cust2,
+            &ctx.developer,
+            &60_000_000i128,
+            &0i128,
+            &0i128,
         );
 
         // Each customer's vault is independent
         ctx.client.debit_vault(
-            &ctx.admin, &cust2, &ctx.developer,
-            &20_000_000i128, &desc(&ctx.env, "api"),
+            &ctx.admin,
+            &cust2,
+            &ctx.developer,
+            &20_000_000i128,
+            &desc(&ctx.env, "api"),
         );
-        assert_eq!(ctx.client.get_balance(&ctx.customer, &ctx.developer), 40_000_000i128);
-        assert_eq!(ctx.client.get_balance(&cust2, &ctx.developer),        40_000_000i128);
+        assert_eq!(
+            ctx.client.get_balance(&ctx.customer, &ctx.developer),
+            40_000_000i128
+        );
+        assert_eq!(
+            ctx.client.get_balance(&cust2, &ctx.developer),
+            40_000_000i128
+        );
     }
 
     // ── low balance + auto top-up ─────────────────────────────────────────────
@@ -1387,7 +1588,9 @@ mod tests {
     fn test_low_balance_threshold_configuration() {
         let ctx = setup();
         let vault = ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
             &50_000_000i128,
             &20_000_000i128, // alert when below 2 USDC
             &0i128,
@@ -1400,17 +1603,25 @@ mod tests {
     fn test_zero_threshold_no_alert() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
             &5_000_000i128,
-            &0i128,   // no threshold
+            &0i128, // no threshold
             &0i128,
         );
         // Debit to nearly zero — should succeed without panic
         ctx.client.debit_vault(
-            &ctx.admin, &ctx.customer, &ctx.developer,
-            &4_000_000i128, &desc(&ctx.env, "api"),
+            &ctx.admin,
+            &ctx.customer,
+            &ctx.developer,
+            &4_000_000i128,
+            &desc(&ctx.env, "api"),
         );
-        assert_eq!(ctx.client.get_balance(&ctx.customer, &ctx.developer), 1_000_000i128);
+        assert_eq!(
+            ctx.client.get_balance(&ctx.customer, &ctx.developer),
+            1_000_000i128
+        );
     }
 
     // ── withdraw zero edge case ───────────────────────────────────────────────
@@ -1419,12 +1630,17 @@ mod tests {
     fn test_withdraw_zero_rejected() {
         let ctx = setup();
         ctx.client.create_vault(
-            &ctx.customer, &ctx.customer, &ctx.developer,
-            &10_000_000i128, &0i128, &0i128,
+            &ctx.customer,
+            &ctx.customer,
+            &ctx.developer,
+            &10_000_000i128,
+            &0i128,
+            &0i128,
         );
-        assert!(ctx.client.try_withdraw(
-            &ctx.customer, &ctx.customer, &ctx.developer, &0i128,
-        ).is_err());
+        assert!(ctx
+            .client
+            .try_withdraw(&ctx.customer, &ctx.customer, &ctx.developer, &0i128,)
+            .is_err());
     }
 
     // ── non-existent vault reads ──────────────────────────────────────────────
@@ -1432,7 +1648,10 @@ mod tests {
     #[test]
     fn test_get_vault_nonexistent_returns_none() {
         let ctx = setup();
-        assert!(ctx.client.get_vault(&ctx.customer, &ctx.developer).is_none());
+        assert!(ctx
+            .client
+            .get_vault(&ctx.customer, &ctx.developer)
+            .is_none());
     }
 
     #[test]
@@ -1445,7 +1664,7 @@ mod tests {
 
     #[test]
     fn test_transfer_admin() {
-        let ctx      = setup();
+        let ctx = setup();
         let new_admin = Address::generate(&ctx.env);
         ctx.client.transfer_admin(&ctx.admin, &new_admin);
         assert_eq!(ctx.client.get_admin(), new_admin);
@@ -1453,9 +1672,12 @@ mod tests {
 
     #[test]
     fn test_transfer_admin_unauthorized_rejected() {
-        let ctx      = setup();
+        let ctx = setup();
         let attacker = Address::generate(&ctx.env);
         let new_admin = Address::generate(&ctx.env);
-        assert!(ctx.client.try_transfer_admin(&attacker, &new_admin).is_err());
+        assert!(ctx
+            .client
+            .try_transfer_admin(&attacker, &new_admin)
+            .is_err());
     }
 }

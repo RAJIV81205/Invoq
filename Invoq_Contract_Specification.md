@@ -771,7 +771,7 @@ deterministic --- the same inputs always produce the same outputs.
   **PARAMETERS**    
 
   customers         Vec\<Address\> --- List of customer wallet addresses to
-                    process renewals for. Maximum 50 per call to stay within
+                    process renewals for. Maximum 30 per call to stay within
                     Soroban instruction limits.
 
   **Returns**       RenewalSummary --- struct containing counts of successful,
@@ -781,7 +781,7 @@ deterministic --- the same inputs always produce the same outputs.
 
   Unauthorized      Invoker is not the contract admin.
 
-  BatchTooLarge     customers Vec contains more than 50 addresses.
+  BatchTooLarge     customers Vec contains more than 30 addresses.
 
   **Notes**         The Invoq backend queries SubscriptionRegistry off-chain
                     to build the customer list of due renewals, then passes it
@@ -840,7 +840,7 @@ deterministic --- the same inputs always produce the same outputs.
   **PARAMETERS**    
 
   customers         Vec\<Address\> --- List of customer addresses in
-                    GracePeriod to check. Maximum 100 per call.
+                    GracePeriod to check. Maximum 50 per call.
 
   **Returns**       u32 --- count of subscriptions expired in this call
 
@@ -979,17 +979,20 @@ controls.
   -------------------- ----------------------------------------------------------
 
   --------------------- ----------------------------------------------------------
-  **Function**          **create_policy(env, daily_limit_usdc, tx_limit_usdc,
+  **Function**          **create_policy(env, owner, daily_limit_usdc, tx_limit_usdc,
                         allowlist, agents)**
 
-  **Visibility**        Public --- invoker becomes the policy owner.
+  **Visibility**        Public --- owner must sign.
 
-  **Description**       Creates a new spend policy for the invoker. The invoker is
-                        set as the policy owner. Registers all addresses in the
+  **Description**       Creates a new spend policy for owner. The owner address
+                        authorizes the call. Registers all addresses in the
                         agents list as governed by this policy for efficient
                         lookup in check_spend.
 
-  **PARAMETERS**        
+  **PARAMETERS**
+
+  owner                 Address --- Policy owner address. Must authorize the
+                        transaction.
 
   daily_limit_usdc      i128 --- Daily spending limit in USDC stroops. Pass 0 for
                         no limit.
@@ -1025,7 +1028,7 @@ controls.
   **Description**   The primary enforcement function. Checks whether a
                     proposed payment from an agent to a destination for the
                     given USDC amount is permitted under the governing policy.
-                    Returns true if permitted, false if blocked. Never panics
+                    Returns a detailed SpendCheckResult. Never panics
                     --- if no policy is found for the agent, the check passes
                     (permissive default).
 
@@ -1038,7 +1041,9 @@ controls.
 
   amount_usdc       i128 --- The payment amount in USDC stroops.
 
-  **Returns**       bool --- true if payment is permitted, false if blocked
+  **Returns**       SpendCheckResult --- Allowed, NoPolicyFound,
+                    BlockedByAllowlist, BlockedByTxLimit, or
+                    BlockedByDailyLimit
 
   **Notes**         Called by the Invoq API layer before any agent-initiated
                     payment is executed. Three checks are performed in order:
@@ -1082,18 +1087,21 @@ controls.
   ----------------- ----------------------------------------------------------
 
   ------------------ ----------------------------------------------------------
-  **Function**       **update_policy(env, daily_limit_usdc, tx_limit_usdc,
+  **Function**       **update_policy(env, caller, daily_limit_usdc, tx_limit_usdc,
                      allowlist, agents)**
 
   **Visibility**     Policy owner only.
 
-  **Description**    Updates all fields of the invoker\'s existing spend
+  **Description**    Updates all fields of caller\'s existing spend
                      policy. All changes take effect immediately --- the next
                      check_spend call after an update reflects the new values.
                      Agent list changes are reflected in AGENT_POLICY storage
                      atomically.
 
-  **PARAMETERS**     
+  **PARAMETERS**
+
+  caller             Address --- Policy owner address. Must authorize the
+                     transaction.
 
   daily_limit_usdc   i128 --- New daily spending limit. Pass 0 for unlimited.
 
@@ -1120,11 +1128,11 @@ controls.
   ------------------ ----------------------------------------------------------
 
   ----------------- ----------------------------------------------------------
-  **Function**      **deactivate_policy(env)**
+  **Function**      **deactivate_policy(env, caller)**
 
   **Visibility**    Policy owner or admin only.
 
-  **Description**   Temporarily deactivates the invoker\'s spend policy. While
+  **Description**   Temporarily deactivates caller\'s spend policy. While
                     inactive, all check_spend calls for agents governed by
                     this policy return true immediately without any limit
                     checking. Used when an enterprise customer needs to

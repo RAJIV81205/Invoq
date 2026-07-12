@@ -31,9 +31,8 @@
 //! Only one operator is active at a time; granting a new one replaces the old.
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, contractevent,
+    contract, contracterror, contractevent, contractimpl, contracttype, log, panic_with_error,
     Address, Env, String, Vec,
-    panic_with_error, log,
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -44,7 +43,7 @@ use soroban_sdk::{
 /// adjust if your network's ledger close time differs.
 const LEDGERS_PER_YEAR: u32 = 6_307_200;
 const PERSISTENT_TTL_THRESHOLD: u32 = LEDGERS_PER_YEAR;
-const PERSISTENT_TTL_BUMP:      u32 = LEDGERS_PER_YEAR;
+const PERSISTENT_TTL_BUMP: u32 = LEDGERS_PER_YEAR;
 
 /// Maximum feature flags per plan
 const MAX_FEATURES: u32 = 32;
@@ -62,33 +61,33 @@ const MIN_INTERVAL_SECONDS: u64 = 86_400;
 #[repr(u32)]
 pub enum Error {
     // Initialisation
-    AlreadyInitialized   = 1,
-    NotInitialized       = 2,
+    AlreadyInitialized = 1,
+    NotInitialized = 2,
 
     // Auth
-    Unauthorized         = 10,
+    Unauthorized = 10,
 
     // Plan errors
-    PlanNotFound         = 20,
-    PlanInactive         = 21,
-    InvalidPlanName      = 22,
-    InvalidInterval      = 23,
-    TooManyFeatures      = 24,
-    InvalidPrice         = 25,
-    AlreadyInactive      = 26,
-    AlreadyActive        = 27,
+    PlanNotFound = 20,
+    PlanInactive = 21,
+    InvalidPlanName = 22,
+    InvalidInterval = 23,
+    TooManyFeatures = 24,
+    InvalidPrice = 25,
+    AlreadyInactive = 26,
+    AlreadyActive = 27,
 
     // Subscription errors
     SubscriptionNotFound = 30,
-    AlreadySubscribed    = 31,
-    InvalidTransition    = 32,
-    InvalidPeriod        = 33,
-    SubscriptionNotActive= 34,
-    AlreadyCancelled     = 35,
+    AlreadySubscribed = 31,
+    InvalidTransition = 32,
+    InvalidPeriod = 33,
+    SubscriptionNotActive = 34,
+    AlreadyCancelled = 35,
 
     // Usage errors
-    ZeroUnits            = 40,
-    BatchTooLarge        = 41,
+    ZeroUnits = 40,
+    BatchTooLarge = 41,
 }
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
@@ -137,7 +136,10 @@ pub enum SubStatus {
 impl SubStatus {
     /// True when the customer should have access to their plan's features.
     pub fn is_entitled(&self) -> bool {
-        matches!(self, SubStatus::Active | SubStatus::Trialing | SubStatus::GracePeriod)
+        matches!(
+            self,
+            SubStatus::Active | SubStatus::Trialing | SubStatus::GracePeriod
+        )
     }
 
     /// True when the subscription is in a terminal state (cannot be renewed).
@@ -240,58 +242,71 @@ pub struct UsageBatchEntry {
 
 #[contractevent]
 pub struct PlanCreated {
-    #[topic] pub plan_id: u64,
-    #[topic] pub owner:   Address,
+    #[topic]
+    pub plan_id: u64,
+    #[topic]
+    pub owner: Address,
 }
 
 #[contractevent]
 pub struct PlanUpdated {
-    #[topic] pub plan_id: u64,
+    #[topic]
+    pub plan_id: u64,
 }
 
 #[contractevent]
 pub struct PlanDeactivated {
-    #[topic] pub plan_id: u64,
+    #[topic]
+    pub plan_id: u64,
 }
 
 #[contractevent]
 pub struct PlanReactivated {
-    #[topic] pub plan_id: u64,
+    #[topic]
+    pub plan_id: u64,
 }
 
 #[contractevent]
 pub struct SubscriptionCreated {
-    #[topic] pub customer: Address,
-    #[topic] pub plan_id:  u64,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub plan_id: u64,
     pub period_end: u64,
 }
 
 #[contractevent]
 pub struct StatusChanged {
-    #[topic] pub customer:   Address,
+    #[topic]
+    pub customer: Address,
     pub old_status: SubStatus,
     pub new_status: SubStatus,
 }
 
 #[contractevent]
 pub struct SubscriptionRenewed {
-    #[topic] pub customer:      Address,
-    #[topic] pub plan_id:       u64,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub plan_id: u64,
     pub new_period_end: u64,
 }
 
 #[contractevent]
 pub struct SubscriptionCancelled {
-    #[topic] pub customer:     Address,
-    pub effective_at:  u64,
-    pub immediate:     bool,
+    #[topic]
+    pub customer: Address,
+    pub effective_at: u64,
+    pub immediate: bool,
 }
 
 #[contractevent]
 pub struct UsageRecorded {
-    #[topic] pub customer:  Address,
-    #[topic] pub plan_id:   u64,
-    pub units:     u64,
+    #[topic]
+    pub customer: Address,
+    #[topic]
+    pub plan_id: u64,
+    pub units: u64,
     pub new_total: u64,
 }
 
@@ -322,17 +337,17 @@ pub struct OperatorRevoked {}
 /// ```
 fn validate_transition(from: &SubStatus, to: &SubStatus) -> bool {
     match (from, to) {
-        (SubStatus::Trialing,    SubStatus::Active)      => true,
-        (SubStatus::Trialing,    SubStatus::Cancelled)   => true,
-        (SubStatus::Active,      SubStatus::GracePeriod) => true,
-        (SubStatus::Active,      SubStatus::Paused)      => true,
-        (SubStatus::Active,      SubStatus::Cancelled)   => true,
-        (SubStatus::Active,      SubStatus::Expired)     => true,
-        (SubStatus::GracePeriod, SubStatus::Active)      => true,
-        (SubStatus::GracePeriod, SubStatus::Cancelled)   => true,
-        (SubStatus::Paused,      SubStatus::Active)      => true,
-        (SubStatus::Paused,      SubStatus::Cancelled)   => true,
-        _                                                => false,
+        (SubStatus::Trialing, SubStatus::Active) => true,
+        (SubStatus::Trialing, SubStatus::Cancelled) => true,
+        (SubStatus::Active, SubStatus::GracePeriod) => true,
+        (SubStatus::Active, SubStatus::Paused) => true,
+        (SubStatus::Active, SubStatus::Cancelled) => true,
+        (SubStatus::Active, SubStatus::Expired) => true,
+        (SubStatus::GracePeriod, SubStatus::Active) => true,
+        (SubStatus::GracePeriod, SubStatus::Cancelled) => true,
+        (SubStatus::Paused, SubStatus::Active) => true,
+        (SubStatus::Paused, SubStatus::Cancelled) => true,
+        _ => false,
     }
 }
 
@@ -488,7 +503,9 @@ fn next_plan_id(env: &Env) -> u64 {
         .instance()
         .get::<DataKey, u64>(&DataKey::PlanCount)
         .unwrap_or(0u64);
-    let next = current.checked_add(1).unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized));
+    let next = current
+        .checked_add(1)
+        .unwrap_or_else(|| panic_with_error!(env, Error::NotInitialized));
     env.storage().instance().set(&DataKey::PlanCount, &next);
     next
 }
@@ -523,7 +540,6 @@ pub struct SubscriptionRegistry;
 
 #[contractimpl]
 impl SubscriptionRegistry {
-
     // ═════════════════════════════════════════════════════════════════════════
     // INITIALISATION
     // ═════════════════════════════════════════════════════════════════════════
@@ -536,7 +552,7 @@ impl SubscriptionRegistry {
         if env.storage().instance().has(&DataKey::Admin) {
             panic_with_error!(&env, Error::AlreadyInitialized);
         }
-        env.storage().instance().set(&DataKey::Admin,   &admin);
+        env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::UsdcSac, &usdc_sac);
         env.storage().instance().set(&DataKey::PlanCount, &0u64);
         log!(&env, "SubscriptionRegistry initialized. admin={}", admin);
@@ -564,7 +580,10 @@ impl SubscriptionRegistry {
     pub fn set_operator(env: Env, operator: Address) {
         load_admin(&env).require_auth();
         env.storage().instance().set(&DataKey::Operator, &operator);
-        OperatorSet { operator: operator.clone() }.publish(&env);
+        OperatorSet {
+            operator: operator.clone(),
+        }
+        .publish(&env);
         log!(&env, "Operator set to {}", operator);
     }
 
@@ -599,7 +618,7 @@ impl SubscriptionRegistry {
     /// The newly created `plan_id`.
     pub fn create_plan(
         env: Env,
-        owner: Address,           // FIX: explicit owner parameter — NOT env.current_contract_address()
+        owner: Address, // FIX: explicit owner parameter — NOT env.current_contract_address()
         name: String,
         price_usdc: i128,
         interval_seconds: u64,
@@ -613,7 +632,7 @@ impl SubscriptionRegistry {
         validate_plan_inputs(&env, &name, price_usdc, interval_seconds, &features);
 
         let plan_id = next_plan_id(&env);
-        let now     = env.ledger().timestamp();
+        let now = env.ledger().timestamp();
 
         let plan = PlanConfig {
             plan_id,
@@ -623,8 +642,8 @@ impl SubscriptionRegistry {
             trial_seconds,
             usage_limit,
             features,
-            active:     true,
-            owner:      owner.clone(),
+            active: true,
+            owner: owner.clone(),
             created_at: now,
         };
 
@@ -653,7 +672,7 @@ impl SubscriptionRegistry {
         validate_plan_inputs(&env, &name, price_usdc, interval_seconds, &features);
 
         let plan_id = next_plan_id(&env);
-        let now     = env.ledger().timestamp();
+        let now = env.ledger().timestamp();
 
         let plan = PlanConfig {
             plan_id,
@@ -663,8 +682,8 @@ impl SubscriptionRegistry {
             trial_seconds,
             usage_limit,
             features,
-            active:     true,
-            owner:      owner.clone(),
+            active: true,
+            owner: owner.clone(),
             created_at: now,
         };
 
@@ -695,10 +714,10 @@ impl SubscriptionRegistry {
         require_privileged_or(&env, &caller, &plan.owner);
         validate_plan_inputs(&env, &name, price_usdc, plan.interval_seconds, &features);
 
-        plan.name        = name;
-        plan.price_usdc  = price_usdc;
+        plan.name = name;
+        plan.price_usdc = price_usdc;
         plan.usage_limit = usage_limit;
-        plan.features    = features;
+        plan.features = features;
 
         store_plan(&env, &plan);
         PlanUpdated { plan_id }.publish(&env);
@@ -737,14 +756,13 @@ impl SubscriptionRegistry {
     /// Bumps TTL on read.
     pub fn get_plan(env: Env, plan_id: u64) -> Option<PlanConfig> {
         let key = DataKey::Plan(plan_id);
-        let result = env
-            .storage()
-            .persistent()
-            .get::<DataKey, PlanConfig>(&key);
+        let result = env.storage().persistent().get::<DataKey, PlanConfig>(&key);
         if result.is_some() {
-            env.storage()
-                .persistent()
-                .extend_ttl(&key, PERSISTENT_TTL_THRESHOLD, PERSISTENT_TTL_BUMP);
+            env.storage().persistent().extend_ttl(
+                &key,
+                PERSISTENT_TTL_THRESHOLD,
+                PERSISTENT_TTL_BUMP,
+            );
         }
         result
     }
@@ -801,19 +819,24 @@ impl SubscriptionRegistry {
         };
 
         let sub = SubscriptionRecord {
-            customer:             customer.clone(),
+            customer: customer.clone(),
             plan_id,
             status,
-            started_at:           now,
+            started_at: now,
             current_period_start: now,
-            current_period_end:   period_end,
+            current_period_end: period_end,
             trial_end,
             cancel_at_period_end: false,
-            usage_current:        0,
+            usage_current: 0,
         };
 
         store_subscription(&env, &sub);
-        SubscriptionCreated { customer, plan_id, period_end }.publish(&env);
+        SubscriptionCreated {
+            customer,
+            plan_id,
+            period_end,
+        }
+        .publish(&env);
 
         sub
     }
@@ -870,8 +893,8 @@ impl SubscriptionRegistry {
         }
 
         sub.current_period_start = new_period_start;
-        sub.current_period_end   = new_period_end;
-        sub.usage_current        = 0;
+        sub.current_period_end = new_period_end;
+        sub.usage_current = 0;
 
         let plan_id = sub.plan_id;
         store_subscription(&env, &sub);
@@ -905,7 +928,7 @@ impl SubscriptionRegistry {
         let now = env.ledger().timestamp();
 
         if immediate {
-            sub.status               = SubStatus::Cancelled;
+            sub.status = SubStatus::Cancelled;
             sub.cancel_at_period_end = false;
             store_subscription(&env, &sub);
             SubscriptionCancelled {
@@ -947,7 +970,7 @@ impl SubscriptionRegistry {
     pub fn check_entitlement(env: Env, customer: Address, feature: String) -> bool {
         let sub = match try_load_subscription(&env, &customer) {
             Some(s) => s,
-            None    => return false,
+            None => return false,
         };
 
         if !sub.status.is_entitled() {
@@ -966,7 +989,7 @@ impl SubscriptionRegistry {
         let key = DataKey::Plan(sub.plan_id);
         let plan = match env.storage().persistent().get::<DataKey, PlanConfig>(&key) {
             Some(p) => p,
-            None    => return false, // Plan deleted — fail safe, deny access
+            None => return false, // Plan deleted — fail safe, deny access
         };
 
         env.storage()
@@ -986,44 +1009,62 @@ impl SubscriptionRegistry {
         feature: String,
     ) -> EntitlementResult {
         // Helper closure for a denied result without plan data
-        let denied_no_plan = |status: SubStatus, plan_id: u64, usage: u64, period_end: u64| {
-            EntitlementResult {
+        let denied_no_plan =
+            |status: SubStatus, plan_id: u64, usage: u64, period_end: u64| EntitlementResult {
                 entitled: false,
                 status,
                 plan_id,
                 usage_current: usage,
                 usage_limit: 0,
                 current_period_end: period_end,
-            }
-        };
+            };
 
         let sub = match try_load_subscription(&env, &customer) {
             Some(s) => s,
-            None    => return EntitlementResult {
-                entitled: false,
-                status: SubStatus::Cancelled,
-                plan_id: 0,
-                usage_current: 0,
-                usage_limit: 0,
-                current_period_end: 0,
-            },
+            None => {
+                return EntitlementResult {
+                    entitled: false,
+                    status: SubStatus::Cancelled,
+                    plan_id: 0,
+                    usage_current: 0,
+                    usage_limit: 0,
+                    current_period_end: 0,
+                }
+            }
         };
 
         if !sub.status.is_entitled() {
-            return denied_no_plan(sub.status, sub.plan_id, sub.usage_current, sub.current_period_end);
+            return denied_no_plan(
+                sub.status,
+                sub.plan_id,
+                sub.usage_current,
+                sub.current_period_end,
+            );
         }
 
         if sub.cancel_at_period_end {
             let now = env.ledger().timestamp();
             if now >= sub.current_period_end {
-                return denied_no_plan(SubStatus::Cancelled, sub.plan_id, sub.usage_current, sub.current_period_end);
+                return denied_no_plan(
+                    SubStatus::Cancelled,
+                    sub.plan_id,
+                    sub.usage_current,
+                    sub.current_period_end,
+                );
             }
         }
 
         let key = DataKey::Plan(sub.plan_id);
         let plan = match env.storage().persistent().get::<DataKey, PlanConfig>(&key) {
             Some(p) => p,
-            None    => return denied_no_plan(sub.status, sub.plan_id, sub.usage_current, sub.current_period_end),
+            None => {
+                return denied_no_plan(
+                    sub.status,
+                    sub.plan_id,
+                    sub.usage_current,
+                    sub.current_period_end,
+                )
+            }
         };
 
         env.storage()
@@ -1031,11 +1072,11 @@ impl SubscriptionRegistry {
             .extend_ttl(&key, PERSISTENT_TTL_THRESHOLD, PERSISTENT_TTL_BUMP);
 
         EntitlementResult {
-            entitled:          plan.features.contains(&feature),
-            status:            sub.status,
-            plan_id:           sub.plan_id,
-            usage_current:     sub.usage_current,
-            usage_limit:       plan.usage_limit,
+            entitled: plan.features.contains(&feature),
+            status: sub.status,
+            plan_id: sub.plan_id,
+            usage_current: sub.usage_current,
+            usage_limit: plan.usage_limit,
             current_period_end: sub.current_period_end,
         }
     }
@@ -1046,7 +1087,7 @@ impl SubscriptionRegistry {
     pub fn is_subscribed(env: Env, customer: Address) -> bool {
         match try_load_subscription(&env, &customer) {
             Some(sub) => sub.status.is_entitled(),
-            None      => false,
+            None => false,
         }
     }
 
@@ -1081,7 +1122,7 @@ impl SubscriptionRegistry {
 
         sub.usage_current = sub.usage_current.saturating_add(units);
         let new_total = sub.usage_current;
-        let plan_id   = sub.plan_id;
+        let plan_id = sub.plan_id;
 
         store_subscription(&env, &sub);
 
@@ -1108,11 +1149,7 @@ impl SubscriptionRegistry {
     /// # Note on Vec<(Address, u64)>
     /// Soroban's XDR encoder does NOT support Rust tuples in Vec.
     /// Use `UsageBatchEntry { customer, units }` instead.
-    pub fn increment_usage_batch(
-        env: Env,
-        caller: Address,
-        entries: Vec<UsageBatchEntry>,
-    ) -> u32 {
+    pub fn increment_usage_batch(env: Env, caller: Address, entries: Vec<UsageBatchEntry>) -> u32 {
         require_privileged(&env, &caller);
 
         // Enforce batch size limit to stay within Soroban instruction budget
@@ -1134,12 +1171,12 @@ impl SubscriptionRegistry {
                     SubStatus::Active | SubStatus::Trialing => {
                         sub.usage_current = sub.usage_current.saturating_add(entry.units);
                         let new_total = sub.usage_current;
-                        let plan_id   = sub.plan_id;
+                        let plan_id = sub.plan_id;
                         store_subscription(&env, &sub);
                         UsageRecorded {
-                            customer:  entry.customer.clone(),
+                            customer: entry.customer.clone(),
                             plan_id,
-                            units:     entry.units,
+                            units: entry.units,
                             new_total,
                         }
                         .publish(&env);
@@ -1165,9 +1202,9 @@ mod tests {
     // ── Test helpers ─────────────────────────────────────────────────────────
 
     struct TestCtx {
-        env:      Env,
-        client:   SubscriptionRegistryClient<'static>,
-        admin:    Address,
+        env: Env,
+        client: SubscriptionRegistryClient<'static>,
+        admin: Address,
         usdc_sac: Address,
     }
 
@@ -1175,15 +1212,20 @@ mod tests {
         let env = Env::default();
         env.mock_all_auths();
 
-        let contract_id = env.register_contract(None, SubscriptionRegistry);
+        let contract_id = env.register(SubscriptionRegistry, ());
         let client = SubscriptionRegistryClient::new(&env, &contract_id);
 
-        let admin    = Address::generate(&env);
+        let admin = Address::generate(&env);
         let usdc_sac = Address::generate(&env);
 
         client.initialize(&admin, &usdc_sac);
 
-        TestCtx { env, client, admin, usdc_sac }
+        TestCtx {
+            env,
+            client,
+            admin,
+            usdc_sac,
+        }
     }
 
     fn features(env: &Env) -> Vec<String> {
@@ -1196,23 +1238,25 @@ mod tests {
 
     fn create_pro_plan(ctx: &TestCtx, owner: &Address) -> u64 {
         ctx.client.create_plan_for(
+            &ctx.admin,
             owner,
             &String::from_str(&ctx.env, "Pro"),
-            &50_000_000i128,    // 5 USDC/month
-            &2_592_000u64,      // 30 days
-            &0u64,              // no trial
-            &100_000u64,        // 100k units
+            &50_000_000i128, // 5 USDC/month
+            &2_592_000u64,   // 30 days
+            &0u64,           // no trial
+            &100_000u64,     // 100k units
             &features(&ctx.env),
         )
     }
 
     fn create_trial_plan(ctx: &TestCtx, owner: &Address) -> u64 {
         ctx.client.create_plan_for(
+            &ctx.admin,
             owner,
             &String::from_str(&ctx.env, "Pro Trial"),
             &50_000_000i128,
             &2_592_000u64,
-            &604_800u64,  // 7-day trial
+            &604_800u64, // 7-day trial
             &100_000u64,
             &features(&ctx.env),
         )
@@ -1223,7 +1267,10 @@ mod tests {
     #[test]
     fn test_init_once() {
         let ctx = setup();
-        assert!(ctx.client.try_initialize(&ctx.admin, &ctx.usdc_sac).is_err());
+        assert!(ctx
+            .client
+            .try_initialize(&ctx.admin, &ctx.usdc_sac)
+            .is_err());
     }
 
     #[test]
@@ -1255,10 +1302,10 @@ mod tests {
 
     #[test]
     fn test_plan_ids_increment() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
-        let id1   = create_pro_plan(&ctx, &owner);
-        let id2   = create_pro_plan(&ctx, &owner);
+        let id1 = create_pro_plan(&ctx, &owner);
+        let id2 = create_pro_plan(&ctx, &owner);
         assert_eq!(id1, 1u64);
         assert_eq!(id2, 2u64);
         assert_eq!(ctx.client.plan_count(), 2u64);
@@ -1266,10 +1313,10 @@ mod tests {
 
     #[test]
     fn test_create_plan_owner_is_correct() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
-        let id    = create_pro_plan(&ctx, &owner);
-        let plan  = ctx.client.get_plan(&id).unwrap();
+        let id = create_pro_plan(&ctx, &owner);
+        let plan = ctx.client.get_plan(&id).unwrap();
         // Verify the owner is the developer wallet, NOT the contract address
         assert_eq!(plan.owner, owner);
     }
@@ -1278,11 +1325,13 @@ mod tests {
     fn test_invalid_interval_rejected() {
         let ctx = setup();
         let result = ctx.client.try_create_plan_for(
+            &ctx.admin,
             &Address::generate(&ctx.env),
             &String::from_str(&ctx.env, "Bad"),
             &0i128,
             &3600u64, // below 86400 minimum
-            &0u64, &0u64,
+            &0u64,
+            &0u64,
             &features(&ctx.env),
         );
         assert!(result.is_err());
@@ -1292,11 +1341,13 @@ mod tests {
     fn test_empty_name_rejected() {
         let ctx = setup();
         let result = ctx.client.try_create_plan_for(
+            &ctx.admin,
             &Address::generate(&ctx.env),
             &String::from_str(&ctx.env, ""),
             &0i128,
             &2_592_000u64,
-            &0u64, &0u64,
+            &0u64,
+            &0u64,
             &features(&ctx.env),
         );
         assert!(result.is_err());
@@ -1306,11 +1357,13 @@ mod tests {
     fn test_negative_price_rejected() {
         let ctx = setup();
         let result = ctx.client.try_create_plan_for(
+            &ctx.admin,
             &Address::generate(&ctx.env),
             &String::from_str(&ctx.env, "Neg"),
             &-1i128,
             &2_592_000u64,
-            &0u64, &0u64,
+            &0u64,
+            &0u64,
             &features(&ctx.env),
         );
         assert!(result.is_err());
@@ -1320,36 +1373,38 @@ mod tests {
 
     #[test]
     fn test_deactivate_then_reactivate() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
-        let id    = create_pro_plan(&ctx, &owner);
+        let id = create_pro_plan(&ctx, &owner);
 
-        ctx.client.deactivate_plan(&id);
+        ctx.client.deactivate_plan(&ctx.admin, &id);
         assert!(!ctx.client.get_plan(&id).unwrap().active);
 
-        ctx.client.reactivate_plan(&id);
+        ctx.client.reactivate_plan(&ctx.admin, &id);
         assert!(ctx.client.get_plan(&id).unwrap().active);
     }
 
     #[test]
     fn test_double_deactivate_rejected() {
-        let ctx   = setup();
+        let ctx = setup();
         let owner = Address::generate(&ctx.env);
-        let id    = create_pro_plan(&ctx, &owner);
-        ctx.client.deactivate_plan(&id);
-        assert!(ctx.client.try_deactivate_plan(&id).is_err());
+        let id = create_pro_plan(&ctx, &owner);
+        ctx.client.deactivate_plan(&ctx.admin, &id);
+        assert!(ctx.client.try_deactivate_plan(&ctx.admin, &id).is_err());
     }
 
     // ── Subscription lifecycle ────────────────────────────────────────────────
 
     #[test]
     fn test_subscription_active_no_trial() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
+        let plan_id = create_pro_plan(&ctx, &owner);
 
-        let sub = ctx.client.create_subscription(&customer, &plan_id);
+        let sub = ctx
+            .client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
 
         assert!(matches!(sub.status, SubStatus::Active));
         assert_eq!(sub.plan_id, plan_id);
@@ -1361,12 +1416,14 @@ mod tests {
 
     #[test]
     fn test_subscription_trialing_with_trial() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_trial_plan(&ctx, &owner);
+        let plan_id = create_trial_plan(&ctx, &owner);
 
-        let sub = ctx.client.create_subscription(&customer, &plan_id);
+        let sub = ctx
+            .client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
 
         assert!(matches!(sub.status, SubStatus::Trialing));
         assert!(sub.trial_end > 0u64);
@@ -1374,89 +1431,107 @@ mod tests {
 
     #[test]
     fn test_duplicate_subscription_rejected() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
+        let plan_id = create_pro_plan(&ctx, &owner);
 
-        ctx.client.create_subscription(&customer, &plan_id);
-        assert!(ctx.client.try_create_subscription(&customer, &plan_id).is_err());
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
+        assert!(ctx
+            .client
+            .try_create_subscription(&ctx.admin, &customer, &plan_id)
+            .is_err());
     }
 
     #[test]
     fn test_resubscribe_after_cancel() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
+        let plan_id = create_pro_plan(&ctx, &owner);
 
-        ctx.client.create_subscription(&customer, &plan_id);
-        ctx.client.cancel_subscription(&customer, &true);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
+        ctx.client.cancel_subscription(&customer, &customer, &true);
 
         // Should be allowed to re-subscribe after cancellation
-        let sub2 = ctx.client.create_subscription(&customer, &plan_id);
+        let sub2 = ctx
+            .client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
         assert!(matches!(sub2.status, SubStatus::Active));
     }
 
     #[test]
     fn test_subscribe_inactive_plan_rejected() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
+        let plan_id = create_pro_plan(&ctx, &owner);
 
-        ctx.client.deactivate_plan(&plan_id);
-        assert!(ctx.client.try_create_subscription(&customer, &plan_id).is_err());
+        ctx.client.deactivate_plan(&ctx.admin, &plan_id);
+        assert!(ctx
+            .client
+            .try_create_subscription(&ctx.admin, &customer, &plan_id)
+            .is_err());
     }
 
     // ── Status transitions ────────────────────────────────────────────────────
 
     #[test]
     fn test_valid_transition_active_to_grace() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
 
-        ctx.client.update_status(&customer, &SubStatus::GracePeriod);
+        ctx.client
+            .update_status(&ctx.admin, &customer, &SubStatus::GracePeriod);
 
         let sub = ctx.client.get_subscription(&customer).unwrap();
         assert!(matches!(sub.status, SubStatus::GracePeriod));
         // GracePeriod still grants entitlement
-        assert!(ctx.client.check_entitlement(
-            &customer, &String::from_str(&ctx.env, "api_access")
-        ));
+        assert!(ctx
+            .client
+            .check_entitlement(&customer, &String::from_str(&ctx.env, "api_access")));
     }
 
     #[test]
     fn test_invalid_transition_cancelled_to_active_rejected() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
-        ctx.client.cancel_subscription(&customer, &true);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
+        ctx.client.cancel_subscription(&customer, &customer, &true);
 
-        assert!(ctx.client.try_update_status(&customer, &SubStatus::Active).is_err());
+        assert!(ctx
+            .client
+            .try_update_status(&ctx.admin, &customer, &SubStatus::Active)
+            .is_err());
     }
 
     // ── Renewal ───────────────────────────────────────────────────────────────
 
     #[test]
     fn test_renewal_resets_usage_and_advances_period() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
-        ctx.client.increment_usage(&customer, &5000u64);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
+        ctx.client.increment_usage(&ctx.admin, &customer, &5000u64);
 
-        let before      = ctx.client.get_subscription(&customer).unwrap();
-        let new_start   = before.current_period_end;
-        let new_end     = new_start + 2_592_000u64;
+        let before = ctx.client.get_subscription(&customer).unwrap();
+        let new_start = before.current_period_end;
+        let new_end = new_start + 2_592_000u64;
 
-        ctx.client.renew_subscription(&customer, &new_start, &new_end);
+        ctx.client
+            .renew_subscription(&ctx.admin, &customer, &new_start, &new_end);
 
         let after = ctx.client.get_subscription(&customer).unwrap();
         assert_eq!(after.usage_current, 0u64);
@@ -1467,18 +1542,21 @@ mod tests {
 
     #[test]
     fn test_renewal_recovers_grace_period() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
-        ctx.client.update_status(&customer, &SubStatus::GracePeriod);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
+        ctx.client
+            .update_status(&ctx.admin, &customer, &SubStatus::GracePeriod);
 
-        let before    = ctx.client.get_subscription(&customer).unwrap();
+        let before = ctx.client.get_subscription(&customer).unwrap();
         let new_start = before.current_period_end;
-        let new_end   = new_start + 2_592_000u64;
+        let new_end = new_start + 2_592_000u64;
 
-        ctx.client.renew_subscription(&customer, &new_start, &new_end);
+        ctx.client
+            .renew_subscription(&ctx.admin, &customer, &new_start, &new_end);
 
         let after = ctx.client.get_subscription(&customer).unwrap();
         assert!(matches!(after.status, SubStatus::Active));
@@ -1486,15 +1564,17 @@ mod tests {
 
     #[test]
     fn test_renewal_invalid_period_rejected() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
 
         // new_end <= new_start must be rejected
-        assert!(ctx.client
-            .try_renew_subscription(&customer, &1_000_000u64, &999_999u64)
+        assert!(ctx
+            .client
+            .try_renew_subscription(&ctx.admin, &customer, &1_000_000u64, &999_999u64)
             .is_err());
     }
 
@@ -1502,54 +1582,66 @@ mod tests {
 
     #[test]
     fn test_entitlement_granted_active() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
 
-        assert!(ctx.client.check_entitlement(&customer, &String::from_str(&ctx.env, "api_access")));
-        assert!(ctx.client.check_entitlement(&customer, &String::from_str(&ctx.env, "webhooks")));
+        assert!(ctx
+            .client
+            .check_entitlement(&customer, &String::from_str(&ctx.env, "api_access")));
+        assert!(ctx
+            .client
+            .check_entitlement(&customer, &String::from_str(&ctx.env, "webhooks")));
         // Feature not in plan
-        assert!(!ctx.client.check_entitlement(&customer, &String::from_str(&ctx.env, "export")));
+        assert!(!ctx
+            .client
+            .check_entitlement(&customer, &String::from_str(&ctx.env, "export")));
     }
 
     #[test]
     fn test_entitlement_denied_no_record() {
-        let ctx     = setup();
-        let nobody  = Address::generate(&ctx.env);
-        assert!(!ctx.client.check_entitlement(&nobody, &String::from_str(&ctx.env, "api_access")));
+        let ctx = setup();
+        let nobody = Address::generate(&ctx.env);
+        assert!(!ctx
+            .client
+            .check_entitlement(&nobody, &String::from_str(&ctx.env, "api_access")));
     }
 
     #[test]
     fn test_entitlement_denied_cancelled() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
-        ctx.client.cancel_subscription(&customer, &true);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
+        ctx.client.cancel_subscription(&customer, &customer, &true);
 
-        assert!(!ctx.client.check_entitlement(&customer, &String::from_str(&ctx.env, "api_access")));
+        assert!(!ctx
+            .client
+            .check_entitlement(&customer, &String::from_str(&ctx.env, "api_access")));
     }
 
     #[test]
     fn test_entitlement_full_returns_usage_data() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
-        ctx.client.increment_usage(&customer, &7500u64);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
+        ctx.client.increment_usage(&ctx.admin, &customer, &7500u64);
 
-        let result = ctx.client.check_entitlement_full(
-            &customer,
-            &String::from_str(&ctx.env, "api_access"),
-        );
+        let result = ctx
+            .client
+            .check_entitlement_full(&customer, &String::from_str(&ctx.env, "api_access"));
 
         assert!(result.entitled);
         assert_eq!(result.usage_current, 7500u64);
-        assert_eq!(result.usage_limit,   100_000u64);
+        assert_eq!(result.usage_limit, 100_000u64);
         assert!(matches!(result.status, SubStatus::Active));
     }
 
@@ -1557,57 +1649,85 @@ mod tests {
 
     #[test]
     fn test_usage_accumulates_correctly() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
 
-        assert_eq!(ctx.client.increment_usage(&customer, &100u64),  100u64);
-        assert_eq!(ctx.client.increment_usage(&customer, &250u64),  350u64);
-        assert_eq!(ctx.client.increment_usage(&customer, &9650u64), 10_000u64);
+        assert_eq!(
+            ctx.client.increment_usage(&ctx.admin, &customer, &100u64),
+            100u64
+        );
+        assert_eq!(
+            ctx.client.increment_usage(&ctx.admin, &customer, &250u64),
+            350u64
+        );
+        assert_eq!(
+            ctx.client.increment_usage(&ctx.admin, &customer, &9650u64),
+            10_000u64
+        );
     }
 
     #[test]
     fn test_zero_units_rejected() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
 
-        assert!(ctx.client.try_increment_usage(&customer, &0u64).is_err());
+        assert!(ctx
+            .client
+            .try_increment_usage(&ctx.admin, &customer, &0u64)
+            .is_err());
     }
 
     #[test]
     fn test_usage_on_inactive_sub_rejected() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
-        ctx.client.cancel_subscription(&customer, &true);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
+        ctx.client.cancel_subscription(&customer, &customer, &true);
 
-        assert!(ctx.client.try_increment_usage(&customer, &100u64).is_err());
+        assert!(ctx
+            .client
+            .try_increment_usage(&ctx.admin, &customer, &100u64)
+            .is_err());
     }
 
     #[test]
     fn test_batch_usage_skips_invalid_entries() {
-        let ctx       = setup();
-        let owner     = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer1 = Address::generate(&ctx.env);
         let customer2 = Address::generate(&ctx.env); // no subscription
-        let plan_id   = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer1, &plan_id);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer1, &plan_id);
 
         let entries = vec![
             &ctx.env,
-            UsageBatchEntry { customer: customer1.clone(), units: 500 },
-            UsageBatchEntry { customer: customer2.clone(), units: 100 }, // no sub — skipped
-            UsageBatchEntry { customer: customer1.clone(), units: 0 },   // zero — skipped
+            UsageBatchEntry {
+                customer: customer1.clone(),
+                units: 500,
+            },
+            UsageBatchEntry {
+                customer: customer2.clone(),
+                units: 100,
+            }, // no sub — skipped
+            UsageBatchEntry {
+                customer: customer1.clone(),
+                units: 0,
+            }, // zero — skipped
         ];
 
-        let count = ctx.client.increment_usage_batch(&entries);
+        let count = ctx.client.increment_usage_batch(&ctx.admin, &entries);
         assert_eq!(count, 1u32); // only customer1's first entry succeeded
 
         let sub = ctx.client.get_subscription(&customer1).unwrap();
@@ -1618,12 +1738,13 @@ mod tests {
 
     #[test]
     fn test_cancel_immediate() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
-        ctx.client.cancel_subscription(&customer, &true);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
+        ctx.client.cancel_subscription(&customer, &customer, &true);
 
         let sub = ctx.client.get_subscription(&customer).unwrap();
         assert!(matches!(sub.status, SubStatus::Cancelled));
@@ -1633,50 +1754,56 @@ mod tests {
 
     #[test]
     fn test_cancel_end_of_period() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
-        ctx.client.cancel_subscription(&customer, &false);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
+        ctx.client.cancel_subscription(&customer, &customer, &false);
 
         let sub = ctx.client.get_subscription(&customer).unwrap();
         // Status stays Active (or Trialing); cancel is scheduled
         assert!(sub.cancel_at_period_end);
         // Still entitled because period hasn't ended
-        assert!(ctx.client.check_entitlement(
-            &customer, &String::from_str(&ctx.env, "api_access")
-        ));
+        assert!(ctx
+            .client
+            .check_entitlement(&customer, &String::from_str(&ctx.env, "api_access")));
     }
 
     #[test]
     fn test_double_cancel_rejected() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let plan_id  = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
-        ctx.client.cancel_subscription(&customer, &true);
+        let plan_id = create_pro_plan(&ctx, &owner);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
+        ctx.client.cancel_subscription(&customer, &customer, &true);
 
-        assert!(ctx.client.try_cancel_subscription(&customer, &true).is_err());
+        assert!(ctx
+            .client
+            .try_cancel_subscription(&customer, &customer, &true)
+            .is_err());
     }
 
     // ── is_subscribed ─────────────────────────────────────────────────────────
 
     #[test]
     fn test_is_subscribed_lifecycle() {
-        let ctx      = setup();
-        let owner    = Address::generate(&ctx.env);
+        let ctx = setup();
+        let owner = Address::generate(&ctx.env);
         let customer = Address::generate(&ctx.env);
-        let nobody   = Address::generate(&ctx.env);
+        let nobody = Address::generate(&ctx.env);
 
         assert!(!ctx.client.is_subscribed(&nobody));
 
         let plan_id = create_pro_plan(&ctx, &owner);
-        ctx.client.create_subscription(&customer, &plan_id);
+        ctx.client
+            .create_subscription(&ctx.admin, &customer, &plan_id);
         assert!(ctx.client.is_subscribed(&customer));
 
-        ctx.client.cancel_subscription(&customer, &true);
+        ctx.client.cancel_subscription(&customer, &customer, &true);
         assert!(!ctx.client.is_subscribed(&customer));
     }
 }

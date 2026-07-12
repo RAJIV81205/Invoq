@@ -2,6 +2,7 @@ import { requireSession, apiFetch } from "@/app/lib/auth-cookie";
 import StatusPill from "@/app/components/StatusPill";
 import EmptyState from "@/app/components/EmptyState";
 import Link from "next/link";
+import type { DashboardSubscription } from "@/app/lib/types";
 
 function short(a: string) { return `${a.slice(0, 6)}…${a.slice(-6)}`; }
 
@@ -9,7 +10,7 @@ export default async function CustomersPage() {
   const session = await requireSession();
   const res = await apiFetch(session, "/v1/subscriptions");
   const data = res.ok ? await res.json() : { subscriptions: [] };
-  const subs: any[] = data.subscriptions ?? [];
+  const subs: DashboardSubscription[] = data.subscriptions ?? [];
 
   return (
     <div className="space-y-6">

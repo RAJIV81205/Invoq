@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/app/components/Modal";
+import { getApiError, getErrorMessage } from "@/app/lib/errors";
 
 export default function NewPlanButton({ stellarAddress }: { stellarAddress: string }) {
   const router = useRouter();
@@ -37,14 +38,14 @@ export default function NewPlanButton({ stellarAddress }: { stellarAddress: stri
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setErr(data?.error ?? "Failed to create plan");
+        setErr(getApiError(data, "Failed to create plan"));
         return;
       }
 
       setTxInfo({ planId: data.planId, txHash: data.txHash });
       router.refresh();
-    } catch (e: any) {
-      setErr(e?.message ?? "Network error");
+    } catch (e: unknown) {
+      setErr(getErrorMessage(e));
     } finally {
       setBusy(false);
     }

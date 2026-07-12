@@ -490,11 +490,13 @@ The deploy script prints the contract addresses. Paste them into `invoq-api/.env
 ```bash
 cd invoq-api
 cp .env.example .env       # fill in MONGODB_URI, Redis config, admin key
+docker compose up -d mongo redis
 bun install
 bun run dev                # http://localhost:3001
 ```
 
-Redis should be available locally on `127.0.0.1:6379` for cache, queues, and jobs.
+For local development, use `MONGODB_URI=mongodb://127.0.0.1:27017/invoq` and
+`REDIS_URL=redis://127.0.0.1:6379`. Redis powers cache, queues, and jobs.
 
 In another terminal, smoke-test it:
 
@@ -561,7 +563,8 @@ The full REST surface is documented in `Invoq_Contract_Specification.md` and exe
 - `POST /v1/subscriptions/:customer/pause` & `/resume` — lifecycle control
 - `GET  /v1/vault/balances` — all vaults for the developer
 - `POST /v1/vault/{build,submit}-deposit-tx` — customer deposits USDC
-- `POST /v1/spend-policies` & `GET /v1/spend-policies/:owner` — enterprise budget policies
+- `POST /v1/spend-policies/build-tx` & `/submit-tx` — owner-signed enterprise budget policies
+- `GET  /v1/spend-policies/:owner` — read enterprise budget policies
 - `POST /v1/spend-policies/check` — public read-only gate
 - `POST /v1/keys/{secret,publishable}` & `DELETE /v1/keys/:id` — API key management
 

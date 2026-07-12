@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getApiError, getErrorMessage } from "@/app/lib/errors";
 
 export default function CustomerActions({ customerAddress, status }: { customerAddress: string; status: string }) {
   const router = useRouter();
@@ -15,12 +16,12 @@ export default function CustomerActions({ customerAddress, status }: { customerA
       const res = await fetch(`/api/subscriptions/${customerAddress}${path}`, { method });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setErr(d?.error ?? "Action failed");
+        setErr(getApiError(d, "Action failed"));
         return;
       }
       router.refresh();
-    } catch (e: any) {
-      setErr(e?.message ?? "Network error");
+    } catch (e: unknown) {
+      setErr(getErrorMessage(e));
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,6 @@
 import { requireSession, apiFetch } from "@/app/lib/auth-cookie";
 import EmptyState from "@/app/components/EmptyState";
+import type { VaultBalance } from "@/app/lib/types";
 
 const STROOPS_PER_USDC = 10_000_000;
 function fmtUsdc(s: string | number | bigint) { return `$${(Number(s) / STROOPS_PER_USDC).toFixed(2)}`; }
@@ -9,7 +10,7 @@ export default async function VaultPage() {
   const session = await requireSession();
   const res = await apiFetch(session, "/v1/vault/balances");
   const data = res.ok ? await res.json() : { vaults: [] };
-  const vaults: any[] = data.vaults ?? [];
+  const vaults: VaultBalance[] = data.vaults ?? [];
 
   return (
     <div className="space-y-6">

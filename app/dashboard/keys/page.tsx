@@ -2,11 +2,12 @@ import { requireSession, apiFetch } from "@/app/lib/auth-cookie";
 import StatusPill from "@/app/components/StatusPill";
 import NewKeyButton from "./NewKeyButton";
 import RevokeButton from "./RevokeButton";
+import type { DashboardApiKey } from "@/app/lib/types";
 
 export default async function KeysPage() {
   const session = await requireSession();
   const res = await apiFetch(session, "/v1/keys");
-  const keys: any[] = res.ok ? await res.json() : [];
+  const keys: DashboardApiKey[] = res.ok ? await res.json() : [];
 
   return (
     <div className="space-y-6">

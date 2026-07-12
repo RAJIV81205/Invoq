@@ -4,6 +4,7 @@ import UsageChart from "@/app/components/UsageChart";
 import StatusPill from "@/app/components/StatusPill";
 import EmptyState from "@/app/components/EmptyState";
 import Link from "next/link";
+import type { DashboardPlan, DashboardSubscription, WebhookDelivery } from "@/app/lib/types";
 
 const STROOPS_PER_USDC = 10_000_000;
 
@@ -28,20 +29,20 @@ export default async function DashboardOverviewPage() {
 
   const plansData = plansRes.ok ? await plansRes.json() : { plans: [] };
   const subsData  = subsRes.ok  ? await subsRes.json()  : { subscriptions: [] };
-  const deliveries = deliveriesRes.ok ? await deliveriesRes.json() : [];
+  const deliveries: WebhookDelivery[] = deliveriesRes.ok ? await deliveriesRes.json() : [];
 
-  const subs = subsData.subscriptions ?? [];
-  const plans = plansData.plans ?? [];
+  const subs: DashboardSubscription[] = subsData.subscriptions ?? [];
+  const plans: DashboardPlan[] = plansData.plans ?? [];
 
   // Compute MRR + ARR using cached planId -> plan map. For now we use the
   // active subscription count and an aggregated estimate.
-  const planMap = new Map<number, any>();
+  const planMap = new Map<number, DashboardPlan>();
   for (const p of plans) planMap.set(Number(p.plan_id), p);
 
   let mrrUsdc = 0;
   for (const s of subs) {
     if (s.status !== "Active" && s.status !== "Trialing" && s.status !== "GracePeriod") continue;
-    const plan = planMap.get(s.planId);
+    const plan = planMap.get(Number(s.planId));
     if (!plan) continue;
     // Monthly normalised: interval_seconds / (30d) * price
     const intervalDays = Number(plan.interval_seconds) / 86_400;
@@ -50,9 +51,9 @@ export default async function DashboardOverviewPage() {
   }
 
   const activeCount = subs.filter(
-    (s: any) => s.status === "Active" || s.status === "Trialing" || s.status === "GracePeriod"
+    (s) => s.status === "Active" || s.status === "Trialing" || s.status === "GracePeriod"
   ).length;
-  const cancelledCount = subs.filter((s: any) => s.status === "Cancelled").length;
+  const cancelledCount = subs.filter((s) => s.status === "Cancelled").length;
 
   // Build a tiny 7-day sparkline of payment.renewed events from the delivery log.
   const days: { label: string; value: number }[] = [];
@@ -98,7 +99,7 @@ export default async function DashboardOverviewPage() {
         <KpiCard label="MRR"           value={fmtUsdc(mrrUsdc)}  hint="monthly recurring" />
         <KpiCard label="ARR"           value={fmtUsdc(mrrUsdc * 12)} hint="annualised" />
         <KpiCard label="Active subs"   value={String(activeCount)} hint={`${cancelledCount} cancelled`} />
-        <KpiCard label="Plans"         value={String(plans.length)} hint={`${plans.filter((p: any) => p.active).length} active`} />
+        <KpiCard label="Plans"         value={String(plans.length)} hint={`${plans.filter((p) => p.active).length} active`} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -154,7 +155,7 @@ export default async function DashboardOverviewPage() {
           </div>
         ) : (
           <div className="divide-y divide-white/10">
-            {deliveries.map((d: any) => (
+            {deliveries.map((d) => (
               <div key={d.id} className="px-5 py-3 flex items-center gap-3">
                 <StatusPill status={d.status} />
                 <span className="font-mono text-xs text-[var(--muted)] flex-1 truncate">{d.event}</span>

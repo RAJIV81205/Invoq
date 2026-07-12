@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Modal from "@/app/components/Modal";
 import SecretKeyModal from "@/app/components/SecretKeyModal";
+import { getApiError, getErrorMessage } from "@/app/lib/errors";
 
 export default function NewKeyButton() {
   const router = useRouter();
@@ -24,11 +25,11 @@ export default function NewKeyButton() {
         body: JSON.stringify({ name }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(data?.error ?? "Failed"); return; }
+      if (!res.ok) { setErr(getApiError(data, "Failed")); return; }
       setSecret(data.key);
       router.refresh();
-    } catch (e: any) {
-      setErr(e?.message ?? "Network error");
+    } catch (e: unknown) {
+      setErr(getErrorMessage(e));
     } finally {
       setBusy(false);
     }

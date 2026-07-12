@@ -44,8 +44,9 @@ export function errorHandler(
   err: unknown,
   req: Request,
   res: Response,
-  _next: NextFunction,
+  next: NextFunction,
 ): void {
+  void next;
   const message = err instanceof Error ? err.message : "Internal server error";
   const status  = (err as { status?: number; statusCode?: number })?.status
                 ?? (err as { statusCode?: number })?.statusCode

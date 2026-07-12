@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getApiError, getErrorMessage } from "@/app/lib/errors";
 
 export default function PayoutAddressForm({ initial, isValid }: { initial: string; isValid: boolean }) {
   const [value, setValue] = useState(initial);
@@ -20,12 +21,12 @@ export default function PayoutAddressForm({ initial, isValid }: { initial: strin
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setErr(d?.error ?? "Failed");
+        setErr(getApiError(d, "Failed"));
         return;
       }
       setOk(true);
-    } catch (e: any) {
-      setErr(e?.message ?? "Network error");
+    } catch (e: unknown) {
+      setErr(getErrorMessage(e));
     } finally {
       setBusy(false);
     }

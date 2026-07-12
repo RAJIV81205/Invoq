@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!**/.env.example
 
 # vercel
 .vercel
@@ -42,8 +44,8 @@ next-env.d.ts
 
 # Rust's output directory
 target
+test_snapshots/
 
 # Local settings
 .soroban
 .stellar
-

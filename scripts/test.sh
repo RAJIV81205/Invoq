@@ -65,8 +65,8 @@ CUSTOMER_SOURCE="imported"
 # Manually set contract IDs
 REGISTRY_CONTRACT_ID="CC5FVK42PNUGPQZRYDYW7EVRIQIW2GTNPF6TVMZBBVPCLLDMJZLKU3PF"
 BILLING_CONTRACT_ID="CAR6HPIXMNI4B4GONOWCXLN2N7VHH45FEX7IM2JDARR7XZHETNVDUUOR"
-SPEND_POLICY_CONTRACT_ID="CDTLW43XT55X5FZB3PPC5Y7UG6PSYC4LW3ZED23YIEIVDXVOT72QHFPG"   # Set after: npm run deploy:spend-policy
-ESCROW_VAULT_CONTRACT_ID="CBANJOGMJZ3CAIHX45UWUTDUVXZIMUYOZPXNHYZLKKHZBQ5ZAR6L2LLO"   # Set after: npm run deploy:escrow-vault
+SPEND_POLICY_CONTRACT_ID="CDTLW43XT55X5FZB3PPC5Y7UG6PSYC4LW3ZED23YIEIVDXVOT72QHFPG"
+ESCROW_VAULT_CONTRACT_ID="CBANJOGMJZ3CAIHX45UWUTDUVXZIMUYOZPXNHYZLKKHZBQ5ZAR6L2LLO"
 
 # Validate core contracts
 if [ -z "$REGISTRY_CONTRACT_ID" ] || [ -z "$BILLING_CONTRACT_ID" ]; then
@@ -116,9 +116,30 @@ skip() {
   SKIP=$((SKIP + 1))
 }
 
+stellar_invoke() {
+  local output
+  local attempt
+
+  for attempt in 1 2 3; do
+    output=$(stellar contract invoke "$@" 2>&1)
+    if ! echo "$output" | grep -q "transaction submission timeout\|TxBadSeq"; then
+      echo "$output"
+      return 0
+    fi
+
+    if [ "$attempt" -lt 3 ]; then
+      echo -e "  ${YELLOW}↻ retrying transient submission failure (${attempt}/3)${NC}" >&2
+      sleep $((attempt * 5))
+    fi
+  done
+
+  echo "$output"
+  return 1
+}
+
 # invoke_registry: calls Registry signed as admin (mywallet)
 invoke_registry() {
-  stellar contract invoke \
+  stellar_invoke \
     --id $REGISTRY_CONTRACT_ID \
     --source-account $SOURCE \
     --network $NETWORK \
@@ -127,7 +148,7 @@ invoke_registry() {
 
 # invoke_billing: calls BillingCycle signed as admin (mywallet)
 invoke_billing() {
-  stellar contract invoke \
+  stellar_invoke \
     --id $BILLING_CONTRACT_ID \
     --source-account $SOURCE \
     --network $NETWORK \
@@ -139,7 +160,7 @@ invoke_billing() {
 invoke_billing_as() {
   local signer="$1"
   shift
-  stellar contract invoke \
+  stellar_invoke \
     --id $BILLING_CONTRACT_ID \
     --source-account "$signer" \
     --network $NETWORK \
@@ -151,7 +172,7 @@ invoke_billing_as() {
 invoke_registry_as() {
   local signer="$1"
   shift
-  stellar contract invoke \
+  stellar_invoke \
     --id $REGISTRY_CONTRACT_ID \
     --source-account "$signer" \
     --network $NETWORK \
@@ -160,7 +181,7 @@ invoke_registry_as() {
 
 # invoke_spend_policy: calls SpendPolicy signed as admin (mywallet)
 invoke_spend_policy() {
-  stellar contract invoke \
+  stellar_invoke \
     --id $SPEND_POLICY_CONTRACT_ID \
     --source-account $SOURCE \
     --network $NETWORK \
@@ -171,7 +192,7 @@ invoke_spend_policy() {
 invoke_spend_policy_as() {
   local signer="$1"
   shift
-  stellar contract invoke \
+  stellar_invoke \
     --id $SPEND_POLICY_CONTRACT_ID \
     --source-account "$signer" \
     --network $NETWORK \
@@ -180,7 +201,7 @@ invoke_spend_policy_as() {
 
 # invoke_escrow_vault: calls EscrowVault signed as admin (mywallet)
 invoke_escrow_vault() {
-  stellar contract invoke \
+  stellar_invoke \
     --id $ESCROW_VAULT_CONTRACT_ID \
     --source-account $SOURCE \
     --network $NETWORK \
@@ -191,7 +212,7 @@ invoke_escrow_vault() {
 invoke_escrow_vault_as() {
   local signer="$1"
   shift
-  stellar contract invoke \
+  stellar_invoke \
     --id $ESCROW_VAULT_CONTRACT_ID \
     --source-account "$signer" \
     --network $NETWORK \
@@ -437,6 +458,13 @@ assert_error "negative price rejected (InvalidPrice)" "$OUT"
 ########################################
 
 section "6 — Subscription creation"
+
+# Start this section from a clean customer subscription state. Testnet state is
+# persistent, and interrupted re-runs can leave Alice subscribed.
+invoke_registry_as $CUSTOMER_SOURCE cancel_subscription \
+  --caller "$CUSTOMER_ADDRESS" \
+  --customer "$CUSTOMER_ADDRESS" \
+  --immediate true > /dev/null 2>&1 || true
 
 # Alice (CUSTOMER_SOURCE) subscribes to the free plan.
 # She signs the transaction herself — initiate_subscription requires customer.require_auth().
@@ -856,7 +884,7 @@ EXPIRY_LEDGER=$(( CURRENT_LEDGER + 518400 ))
 echo "  → Current ledger: $CURRENT_LEDGER  |  Expiry ledger: $EXPIRY_LEDGER"
 
 step "16.1" "Check alice's USDC balance before subscribing"
-OUT=$(stellar contract invoke \
+OUT=$(stellar_invoke \
   --id "$USDC_SAC" \
   --source-account $CUSTOMER_SOURCE \
   --network $NETWORK \
@@ -868,7 +896,7 @@ echo "  → Alice USDC balance: $(echo "$OUT" | grep -o '"[0-9]*"' | tr -d '"')"
 step "16.2" "Alice approves BillingCycle to spend her USDC"
 # The customer must pre-approve BillingCycle as a spender before subscribing.
 # BillingCycle calls transfer_from(spender=itself, from=customer, to=plan_owner).
-OUT=$(stellar contract invoke \
+OUT=$(stellar_invoke \
   --id "$USDC_SAC" \
   --source-account $CUSTOMER_SOURCE \
   --network $NETWORK \
@@ -880,7 +908,7 @@ OUT=$(stellar contract invoke \
 assert_success "USDC approve succeeds" "$OUT"
 
 step "16.3" "Verify allowance is set"
-OUT=$(stellar contract invoke \
+OUT=$(stellar_invoke \
   --id "$USDC_SAC" \
   --source-account $CUSTOMER_SOURCE \
   --network $NETWORK \
@@ -919,7 +947,7 @@ OUT=$(invoke_registry check_entitlement \
 assert_contains "webhooks granted on paid plan" "$OUT" "true"
 
 step "16.8" "Alice's USDC balance decreased by 5 USDC after subscription"
-OUT=$(stellar contract invoke \
+OUT=$(stellar_invoke \
   --id "$USDC_SAC" \
   --source-account $CUSTOMER_SOURCE \
   --network $NETWORK \
@@ -929,7 +957,7 @@ assert_success "USDC balance query after subscription succeeds" "$OUT"
 echo "  → Alice USDC balance after subscription: $(echo "$OUT" | grep -o '"[0-9]*"' | tr -d '"')"
 
 step "16.9" "Plan owner (admin) received the 5 USDC payment"
-OUT=$(stellar contract invoke \
+OUT=$(stellar_invoke \
   --id "$USDC_SAC" \
   --source-account $SOURCE \
   --network $NETWORK \
@@ -959,7 +987,7 @@ assert_contains "not entitled after paid plan cancel" "$OUT" "false"
 
 step "16.13" "Subscribe with zero allowance is rejected (PaymentFailed)"
 # Revoke allowance by setting it to 0
-stellar contract invoke \
+stellar_invoke \
   --id "$USDC_SAC" \
   --source-account $CUSTOMER_SOURCE \
   --network $NETWORK \
@@ -1315,7 +1343,7 @@ else
 EXPIRY_LEDGER=$((CURRENT_LEDGER + 518400))  # ~30 days
 
 step "18.5" "Approve EscrowVault to spend USDC on behalf of customer"
-OUT=$(stellar contract invoke \
+OUT=$(stellar_invoke \
   --id "$USDC_SAC" \
   --source-account $CUSTOMER_SOURCE \
   --network $NETWORK \

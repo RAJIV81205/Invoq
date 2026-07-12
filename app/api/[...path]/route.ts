@@ -5,11 +5,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { API_BASE_URL } from "@/app/lib/config";
+import { getErrorMessage } from "@/app/lib/errors";
 
 async function handle(req: NextRequest, params: Promise<{ path: string[] }>) {
   const { path } = await params;
   const subPath = (path ?? []).join("/");
-  const url = `${API_BASE_URL}/v1/${subPath}${req.nextUrl.search}`;
+  const upstreamPath = subPath === "health" ? "/health" : `/v1/${subPath}`;
+  const url = `${API_BASE_URL}${upstreamPath}${req.nextUrl.search}`;
 
   // Auth gate: /v1/developers/signup, /login, and /health are open; everything
   // else needs the invoq_session cookie.
@@ -49,9 +51,9 @@ async function handle(req: NextRequest, params: Promise<{ path: string[] }>) {
       body,
       redirect: "manual",
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json(
-      { error: `Upstream unreachable: ${err?.message ?? String(err)}` },
+      { error: `Upstream unreachable: ${getErrorMessage(err, String(err))}` },
       { status: 502 },
     );
   }

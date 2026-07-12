@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { runAllTests } from "./test";
 import { connectFreighter, getFreighterAddress } from "@/lib/freighter";
 import type { TestResult } from "@/lib/types";
+import { getErrorMessage } from "@/app/lib/errors";
 
 const SECTIONS = [
   "Health & Auth",
@@ -30,8 +31,8 @@ export default function TestPage() {
       await connectFreighter();
       const address = await getFreighterAddress();
       setWalletAddress(address);
-    } catch (error: any) {
-      alert(`Failed to connect: ${error.message}`);
+    } catch (error: unknown) {
+      alert(`Failed to connect: ${getErrorMessage(error)}`);
     } finally {
       setIsConnecting(false);
     }
@@ -59,8 +60,8 @@ export default function TestPage() {
 
     try {
       await runAllTests(walletAddress, report);
-    } catch (error: any) {
-      alert(`Test suite error: ${error.message}`);
+    } catch (error: unknown) {
+      alert(`Test suite error: ${getErrorMessage(error)}`);
     } finally {
       setIsRunning(false);
       setCurrentSection(null);
