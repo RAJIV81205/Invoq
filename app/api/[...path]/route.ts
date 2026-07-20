@@ -79,7 +79,8 @@ async function handle(req: NextRequest, params: Promise<{ path: string[] }>) {
       });
       response.cookies.set("invoq_session", data.secretKey, {
         httpOnly: true,
-        sameSite: "lax",
+        sameSite: "strict",
+        secure: process.env.NODE_ENV === "production",
         path: "/",
         // 30 days
         maxAge: 60 * 60 * 24 * 30,
@@ -96,7 +97,8 @@ async function handle(req: NextRequest, params: Promise<{ path: string[] }>) {
       const response = NextResponse.json(data);
       response.cookies.set("invoq_session", data.secretKey, {
         httpOnly: true,
-        sameSite: "lax",
+        sameSite: "strict",
+        secure: process.env.NODE_ENV === "production",
         path: "/",
         maxAge: 60 * 60 * 24 * 30,
       });

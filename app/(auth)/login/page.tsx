@@ -15,6 +15,7 @@ function LoginForm() {
   const from = params.get("from") ?? "/dashboard";
 
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +27,7 @@ function LoginForm() {
       const res = await fetch("/api/developers/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, confirm: true }),
+        body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -47,8 +48,7 @@ function LoginForm() {
       <div className="eyebrow">Sign in</div>
       <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em]">Welcome back.</h1>
       <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-        Use the email tied to your developer account. We&apos;ll reissue a fresh key if the session is
-        missing.
+        Use your developer account email and password to sign in.
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -64,6 +64,21 @@ function LoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             className="input-shell"
             placeholder="you@example.com"
+          />
+        </div>
+        <div>
+          <label className="mb-2 block text-sm font-medium" htmlFor="password">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            required
+            minLength={12}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="input-shell"
+            placeholder="At least 12 characters"
           />
         </div>
         {error && (

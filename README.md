@@ -517,7 +517,7 @@ Visit:
 
 - `http://localhost:3000`         — landing page
 - `http://localhost:3000/signup`  — create a developer + receive your first secret API key
-- `http://localhost:3000/login`   — sign in with the email you used
+- `http://localhost:3000/login`   — sign in with your email and password
 - `http://localhost:3000/dashboard` — overview, plans, customers, webhooks, usage, vault, API keys, settings
 - `http://localhost:3000/test`    — end-to-end test suite (Freighter wallet required)
 

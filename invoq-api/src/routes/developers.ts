@@ -9,7 +9,7 @@
  *   PATCH /v1/developers/me      →  update name / payoutAddress (auth: sk)
  */
 
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { StrKey } from "@stellar/stellar-sdk";
 import {
   createDeveloper,
@@ -24,6 +24,7 @@ import { createApiKey } from "../lib/auth/api-key.js";
 import { authenticate } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/error.js";
 import { createLogger } from "../lib/logger.js";
+import { hashPassword, verifyPassword } from "../lib/auth/password.js";
 
 const log = createLogger("developers");
 
@@ -42,10 +43,36 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function isValidPassword(password: unknown): password is string {
+  return typeof password === "string" && password.length >= 12 && password.length <= 256;
+}
+
+const failedLogins = new Map<string, { count: number; resetAt: number }>();
+const LOGIN_WINDOW_MS = 15 * 60_000;
+const LOGIN_MAX_ATTEMPTS = 5;
+
+function loginRateKey(req: Request, email: string): string {
+  return `${req.ip ?? req.socket?.remoteAddress ?? "unknown"}:${email}`;
+}
+
+function loginBlocked(key: string): boolean {
+  const nowMs = Date.now();
+  const current = failedLogins.get(key);
+  if (!current || current.resetAt <= nowMs) {
+    failedLogins.set(key, { count: 0, resetAt: nowMs + LOGIN_WINDOW_MS });
+    return false;
+  }
+  return current.count >= LOGIN_MAX_ATTEMPTS;
+}
+
 // ─── POST /v1/developers/signup ──────────────────────────────────────────────
 //
 // Self-custodied onboarding.
-//   body: { stellarAddress, email, name }
+//   body: { stellarAddress, email, name, password }
 //   - validates the Stellar address and email
 //   - upserts the developers row (idempotent on stellarAddress)
 //   - mints the first sk_live_ key and returns the plaintext ONCE
@@ -53,7 +80,8 @@ function isValidEmail(email: string): boolean {
 router.post(
   "/signup",
   asyncHandler(async (req, res) => {
-    const { stellarAddress, email, name } = req.body ?? {};
+    const { stellarAddress, email: rawEmail, name, password } = req.body ?? {};
+    const email = typeof rawEmail === "string" ? normalizeEmail(rawEmail) : rawEmail;
 
     if (!isValidStellarAddress(stellarAddress)) {
       res.status(400).json({ error: "stellarAddress must be a valid Stellar G... address" });
@@ -63,63 +91,58 @@ router.post(
       res.status(400).json({ error: "email is required and must be a valid address" });
       return;
     }
+    if (!isValidPassword(password)) {
+      res.status(400).json({ error: "password is required and must be 12-256 characters" });
+      return;
+    }
     if (!name || typeof name !== "string" || name.trim().length === 0 || name.length > 255) {
       res.status(400).json({ error: "name is required (1-255 chars)" });
       return;
     }
 
-    // Idempotency: a developer is uniquely identified by stellarAddress.
+    // Never rotate keys for an existing account from signup.
     const existingByAddress = await findDeveloperByStellarAddress(stellarAddress);
 
-    let developerId: string;
-    let isNew = false;
-
     if (existingByAddress) {
-      const row = existingByAddress;
-      if (row.email !== email) {
-        res.status(409).json({
-          error: "Stellar address already registered with a different email",
-        });
-        return;
-      }
-      developerId = row.id;
-    } else {
-      const existingByEmail = await findDeveloperByEmail(email);
-      if (existingByEmail) {
-        res.status(409).json({
-          error: "Email already registered with a different Stellar address",
-        });
-        return;
-      }
-
-      developerId = newId();
-      await createDeveloper({
-        id:             developerId,
-        stellarAddress,
-        email,
-        name:           name.trim(),
-        payoutAddress:  null,
-        createdAt:      now(),
-        updatedAt:      now(),
-      });
-      isNew = true;
+      res.status(409).json({ error: "Account already exists; sign in instead" });
+      return;
     }
+
+    const existingByEmail = await findDeveloperByEmail(email);
+    if (existingByEmail) {
+      res.status(409).json({
+        error: "Email already registered with a different Stellar address",
+      });
+      return;
+    }
+
+    const developerId = newId();
+    await createDeveloper({
+      id:             developerId,
+      stellarAddress,
+      email,
+      passwordHash:   await hashPassword(password),
+      name:           name.trim(),
+      payoutAddress:  null,
+      createdAt:      now(),
+      updatedAt:      now(),
+    });
 
     const created = await createApiKey({
       developerId,
       type: "sk",
       env:  "live",
-      name: isNew ? "default" : "rotated",
+      name: "default",
     });
 
     log.info("developer signup", {
       developerId,
       stellarAddress,
-      isNew,
+      isNew: true,
       keyId: created.keyId,
     });
 
-    res.status(isNew ? 201 : 200).json({
+    res.status(201).json({
       developerId,
       stellarAddress,
       email,
@@ -127,39 +150,44 @@ router.post(
       secretKey:  created.plaintext,
       keyId:      created.keyId,
       env:        "live",
-      created:    isNew,
+      created:    true,
     });
   })
 );
 
 // ─── POST /v1/developers/login ───────────────────────────────────────────────
 //
-// Mints a fresh sk_live_ key for a given email (key rotation on every login).
-// Requires confirm=true to prevent accidental plaintext-key leakage.
-//
-// In production this should be paired with a magic-link / OTP flow that
-// proves control of the email. The dashboard wires that in front of this
-// endpoint; the API surface is intentionally minimal.
+// Mints a fresh sk_live_ key only after password verification.
 router.post(
   "/login",
   asyncHandler(async (req, res) => {
-    const { email, confirm } = req.body ?? {};
+    const { email: rawEmail, password } = req.body ?? {};
+    const email = typeof rawEmail === "string" ? normalizeEmail(rawEmail) : rawEmail;
     if (!isValidEmail(email)) {
       res.status(400).json({ error: "email is required" });
       return;
     }
-    if (confirm !== true) {
+    if (typeof password !== "string" || password.length === 0) {
       res.status(400).json({
-        error: "login requires confirm=true - issuing a secret key is sensitive",
+        error: "email or password is invalid",
       });
       return;
     }
 
-    const dev = await findDeveloperByEmail(email);
-    if (!dev) {
-      res.status(404).json({ error: "No developer found for that email" });
+    const rateKey = loginRateKey(req, email);
+    if (loginBlocked(rateKey)) {
+      res.status(429).json({ error: "Too many login attempts. Try again later." });
       return;
     }
+
+    const dev = await findDeveloperByEmail(email);
+    if (!dev || !(await verifyPassword(password, dev.passwordHash))) {
+      const current = failedLogins.get(rateKey);
+      if (current) current.count += 1;
+      res.status(401).json({ error: "email or password is invalid" });
+      return;
+    }
+    failedLogins.delete(rateKey);
 
     const created = await createApiKey({
       developerId: dev.id,

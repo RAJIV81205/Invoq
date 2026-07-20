@@ -100,14 +100,14 @@ bun run typecheck
 ### Sign up
 
 1. Open `/signup`
-2. Enter name, email, and Stellar wallet address
+2. Enter name, email, password, and Stellar wallet address
 3. Save the secret key shown in the modal
 4. You land in `/dashboard`
 
 ### Sign in
 
 1. Open `/login`
-2. Enter the email used for signup
+2. Enter email and password used for signup
 3. The app refreshes the session and sends you to the dashboard
 
 ### Create a plan

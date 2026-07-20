@@ -46,6 +46,7 @@ export interface DeveloperRecord {
   id: string;
   stellarAddress: string;
   email: string;
+  passwordHash: string;
   name: string;
   payoutAddress: string | null;
   createdAt: Date;

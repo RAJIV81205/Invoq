@@ -4,6 +4,7 @@ import "dotenv/config";
 
 // NOW import modules that depend on environment variables
 import { createApiKey } from "../src/lib/auth/api-key.js";
+import { hashPassword } from "../src/lib/auth/password.js";
 import {
   createDeveloper,
   findDeveloperByEmail,
@@ -15,9 +16,15 @@ import {
 const stellarAddress = process.env.CUSTOMER_ADDRESS ?? process.env.TEST_CUSTOMER_ADDRESS;
 const email = process.env.TEST_DEVELOPER_EMAIL ?? "smoke-test@invoq.local";
 const name = process.env.TEST_DEVELOPER_NAME ?? "Smoke Test Developer";
+const password = process.env.TEST_DEVELOPER_PASSWORD;
 
 if (!stellarAddress) {
   console.error("Set CUSTOMER_ADDRESS or TEST_CUSTOMER_ADDRESS to the developer Stellar G... address.");
+  process.exit(1);
+}
+
+if (!password || password.length < 12) {
+  console.error("Set TEST_DEVELOPER_PASSWORD with at least 12 characters.");
   process.exit(1);
 }
 
@@ -35,6 +42,7 @@ if (!developer) {
       id:             developerId,
       stellarAddress,
       email,
+      passwordHash:   await hashPassword(password),
       name,
       payoutAddress:  null,
       createdAt:      now(),

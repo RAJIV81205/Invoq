@@ -10,6 +10,8 @@ export default function SignupPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [stellarAddress, setStellarAddress] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,10 +22,14 @@ export default function SignupPage() {
     setError(null);
     setSubmitting(true);
     try {
+      if (password !== confirmPassword) {
+        setError("Passwords do not match");
+        return;
+      }
       const res = await fetch("/api/developers/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, stellarAddress }),
+        body: JSON.stringify({ name, email, stellarAddress, password }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -50,8 +56,8 @@ export default function SignupPage() {
         <div className="eyebrow">Create account</div>
         <h1 className="mt-4 text-3xl font-semibold tracking-[-0.05em]">Start billing on Stellar.</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-          Create plans, issue API keys, and manage webhook delivery from one dashboard. Your first
-          secret key is shown only once.
+          Create plans, issue API keys, and manage webhook delivery from one dashboard. Your password
+          is stored as a secure hash; your first secret key is shown only once.
         </p>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -66,6 +72,35 @@ export default function SignupPage() {
               onChange={(e) => setName(e.target.value)}
               className="input-shell"
               placeholder="Your name or company"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium" htmlFor="password">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              minLength={12}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input-shell"
+              placeholder="At least 12 characters"
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium" htmlFor="confirm-password">
+              Confirm password
+            </label>
+            <input
+              id="confirm-password"
+              type="password"
+              required
+              minLength={12}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="input-shell"
             />
           </div>
           <div>
