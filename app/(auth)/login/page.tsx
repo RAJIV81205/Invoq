@@ -16,6 +16,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,16 +71,38 @@ function LoginForm() {
           <label className="mb-2 block text-sm font-medium" htmlFor="password">
             Password
           </label>
-          <input
-            id="password"
-            type="password"
-            required
-            minLength={12}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="input-shell"
-            placeholder="At least 12 characters"
-          />
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              required
+              minLength={12}
+              maxLength={256}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input-shell pr-20"
+              placeholder="Enter your 12–256 character password"
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              className="absolute inset-y-0 right-3 my-auto h-9 px-2 text-xs font-medium text-[var(--muted)] hover:text-white"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-pressed={showPassword}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
+                {showPassword ? (
+                  <>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.58 10.58a2 2 0 002.83 2.83M9.88 4.24A10.7 10.7 0 0112 4c5.23 0 8.73 4.5 9.7 6a11.6 11.6 0 01-3.1 3.42M6.23 6.23C3.95 7.67 2.62 9.5 2.3 10c.97 1.5 4.47 6 9.7 6 1.13 0 2.17-.2 3.11-.53" />
+                  </>
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.3 10C3.27 8.5 6.77 4 12 4s8.73 4.5 9.7 6c-.97 1.5-4.47 6-9.7 6S3.27 11.5 2.3 10zM12 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+                )}
+              </svg>
+            </button>
+          </div>
         </div>
         {error && (
           <div className="rounded-2xl border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-4 py-3 text-sm text-rose-200">
