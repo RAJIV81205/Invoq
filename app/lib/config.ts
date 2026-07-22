@@ -22,5 +22,8 @@ export const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
 // can fall back to INVOQ_API_URL or a default.
 export const API_BASE_URL =
   (typeof window === "undefined"
-    ? process.env.INVOQ_API_URL ?? process.env.NEXT_PUBLIC_INVOQ_API_URL
-    : process.env.NEXT_PUBLIC_INVOQ_API_URL) ?? "http://localhost:3001";
+    ? process.env.INVOQ_API_URL?.trim() ||
+      process.env.NEXT_PUBLIC_INVOQ_API_URL?.trim()
+    : process.env.NEXT_PUBLIC_INVOQ_API_URL)
+    ?.trim()
+    .replace(/\/$/, "") || "http://localhost:3001";

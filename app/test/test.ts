@@ -1,7 +1,7 @@
 import type { ReportFn, TestResult } from "@/lib/types";
 import { api, apiNoAuth } from "@/lib/apiClient";
 import { signXdr } from "@/lib/freighter";
-import { NETWORK_PASSPHRASE } from "@/lib/config";
+import { API_BASE_URL, NETWORK_PASSPHRASE } from "@/lib/config";
 import { getErrorMessage } from "@/app/lib/errors";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
     path: string,
     opts?: { body?: unknown; headers?: Record<string, string> },
   ): Promise<{ status: number; data: unknown }> {
-    const res = await fetch(`http://localhost:3001${path}`, {
+    const res = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -86,7 +86,7 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
   }
 
   {
-    const r = await fetch(`http://localhost:3001/v1/plans/1`, {
+    const r = await fetch(`${API_BASE_URL}/v1/plans/1`, {
       headers: { Authorization: "Bearer sk_live_badkey" },
     });
     report(s0, r.status === 401
@@ -835,7 +835,7 @@ export async function runAllTests(developerAddress: string, report: ReportFn) {
   // 8.1 — Developer signup
   {
     const stamp = Date.now();
-    const signupRes = await fetch(`http://localhost:3001/v1/developers/signup`, {
+    const signupRes = await fetch(`${API_BASE_URL}/v1/developers/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

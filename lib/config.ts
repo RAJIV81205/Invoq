@@ -10,7 +10,8 @@ export const ESCROW_VAULT_CONTRACT_ADDRESS = "CBANJOGMJZ3CAIHX45UWUTDUVXZIMUYOZP
 // At runtime the dashboard's BFF handles auth — the dashboard's own
 // `apiClient.ts` is only used by the manual /test page.
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_INVOQ_API_URL ?? "http://localhost:3001";
+  process.env.NEXT_PUBLIC_INVOQ_API_URL?.trim().replace(/\/$/, "") ||
+  "http://localhost:3001";
 
 // The /test page uses this. The actual dashboard goes through the BFF.
 export const API_KEY = process.env.TEST_API_KEY ?? "";
