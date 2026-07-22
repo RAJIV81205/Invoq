@@ -114,7 +114,10 @@ export default function LivePlatformStats() {
                 <span className="stats-rail-pulse" />
                 <span className="stats-rail-pulse stats-rail-pulse-b" />
               </div>
-           
+              <div className="mt-3 flex justify-between font-data text-[0.58rem] uppercase tracking-[0.12em] text-[var(--muted-deep)]">
+                <span>Customer wallet</span>
+                <span>Developer wallet</span>
+              </div>
             </div>
           </dd>
         </div>
