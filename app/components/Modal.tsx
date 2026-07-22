@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 export default function Modal({
   open,
@@ -17,14 +18,19 @@ export default function Modal({
 }) {
   useEffect(() => {
     if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const sizes = {
     sm: "max-w-sm",
@@ -33,17 +39,21 @@ export default function Modal({
     xl: "max-w-4xl",
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/75 backdrop-blur-xl p-4"
+      className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-slate-950/75 p-4 backdrop-blur-xl"
       onClick={onClose}
+      role="presentation"
     >
       <div
-        className={`w-full ${sizes[size]} surface-strong rounded-[1.75rem]`}
+        className={`relative z-[101] my-auto w-full ${sizes[size]} surface-strong max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[1.75rem]`}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
       >
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-          <h2 className="text-base font-semibold tracking-[-0.02em]">{title}</h2>
+          <h2 id="modal-title" className="text-base font-semibold tracking-[-0.02em]">{title}</h2>
           <button
             onClick={onClose}
             aria-label="Close"
@@ -56,6 +66,7 @@ export default function Modal({
         </div>
         <div className="p-6">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

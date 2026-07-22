@@ -16,7 +16,8 @@ const COLORS: Record<string, string> = {
 export default function StatusPill({ status }: { status: string }) {
   const cls = COLORS[status] ?? "bg-zinc-500/15 text-zinc-300 ring-zinc-500/30";
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold tracking-[0.02em] ring-1 ring-inset ${cls}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.68rem] font-medium tracking-[0.02em] ring-1 ring-inset ${cls}`}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
       {status}
     </span>
   );

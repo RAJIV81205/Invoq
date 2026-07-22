@@ -1,0 +1,149 @@
+.page {
+  --ink: #14201e;
+  --paper: #f2f0e8;
+  --cream: #fbfaf5;
+  --coral: #ff6b4a;
+  --mint: #9de2c2;
+  --blue: #a9c8ef;
+  min-height: 100vh;
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.header {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  min-height: 82px;
+  padding: 0 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(20, 32, 30, .22);
+}
+
+.brand { display: flex; align-items: center; gap: 11px; color: inherit; font-size: 20px; font-weight: 800; letter-spacing: -.04em; }
+.brandMark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; color: var(--paper); background: var(--ink); font-family: Georgia, serif; font-style: italic; }
+.nav { display: flex; align-items: center; gap: 30px; font-size: 13px; font-weight: 700; }
+.nav a { color: inherit; }
+.integrationToggle { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(20, 32, 30, .24); border-radius: 999px; padding: 9px 13px; cursor: pointer; background: transparent; color: inherit; font: inherit; }
+.liveDot, .draftDot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.liveDot { background: #1d9b64; box-shadow: 0 0 0 4px rgba(29, 155, 100, .13); }
+.draftDot { background: #d29024; box-shadow: 0 0 0 4px rgba(210, 144, 36, .13); }
+
+.integrationPanel {
+  width: min(1440px, 100%);
+  max-height: 0;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: .85fr 1.15fr 1fr;
+  gap: 28px;
+  overflow: hidden;
+  padding: 0 42px;
+  opacity: 0;
+  color: #eef9f5;
+  background: var(--ink);
+  transition: max-height 380ms ease, padding 380ms ease, opacity 250ms ease;
+}
+.panelOpen { max-height: 580px; padding-top: 30px; padding-bottom: 30px; opacity: 1; }
+.integrationIntro h2 { margin: 10px 0 8px; max-width: 340px; font: 700 clamp(26px, 3vw, 40px)/.98 Georgia, serif; letter-spacing: -.045em; }
+.integrationIntro p:last-child { max-width: 340px; margin: 0; color: #aebbb7; font-size: 13px; line-height: 1.6; }
+.kicker { margin: 0; text-transform: uppercase; letter-spacing: .16em; font: 800 10px/1.4 "Courier New", monospace; }
+.fields { display: grid; grid-template-columns: 1fr 100px; gap: 12px; align-content: start; }
+.fields label { grid-column: 1 / -1; display: grid; gap: 6px; color: #aebbb7; text-transform: uppercase; letter-spacing: .1em; font: 700 9px/1.2 "Courier New", monospace; }
+.fields .planField { grid-column: 1; }
+.fields input { min-width: 0; width: 100%; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; padding: 11px 12px; outline: none; color: white; background: rgba(255,255,255,.07); font: 13px/1.2 "Courier New", monospace; }
+.fields input:focus { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(157,226,194,.12); }
+.applyButton { align-self: end; min-height: 39px; border: 0; border-radius: 4px; cursor: pointer; color: var(--ink); background: var(--mint); font-weight: 800; }
+.applyButton:disabled { opacity: .55; cursor: wait; }
+.codeCard { align-self: stretch; min-width: 0; border: 1px solid rgba(255,255,255,.14); border-radius: 8px; overflow: hidden; background: #0b1211; }
+.codeTop { height: 35px; display: flex; align-items: center; gap: 6px; padding: 0 12px; border-bottom: 1px solid rgba(255,255,255,.1); color: #81908c; }
+.codeTop span { width: 7px; height: 7px; border-radius: 50%; background: #42504c; }
+.codeTop b { margin-left: auto; font: 9px "Courier New", monospace; }
+.codeCard code { display: block; padding: 17px; color: #dce7e3; font: 11px/1.65 "Courier New", monospace; overflow-x: auto; }
+.codeLine { display: block; white-space: nowrap; }
+.codeLine i { color: var(--coral); font-style: normal; }
+.codeLine em { color: var(--mint); font-style: normal; }
+
+.hero { width: min(1440px, 100%); min-height: 650px; margin: 0 auto; padding: 76px 42px 70px; display: grid; grid-template-columns: minmax(0, .82fr) minmax(460px, 1.18fr); align-items: center; gap: 80px; }
+.heroCopy h1 { max-width: 630px; margin: 18px 0 24px; font: 700 clamp(58px, 7.2vw, 112px)/.83 Georgia, serif; letter-spacing: -.075em; }
+.lede { max-width: 510px; margin: 0; font-size: 17px; line-height: 1.65; }
+.heroActions { margin-top: 34px; display: flex; align-items: center; gap: 18px; font-size: 11px; font-weight: 700; }
+.primaryLink { display: inline-flex; padding: 13px 18px; border-radius: 3px; color: var(--paper); background: var(--ink); }
+.instrument { position: relative; min-height: 410px; padding: 24px; display: grid; grid-template-rows: auto 1fr auto; border: 1px solid rgba(20,32,30,.35); border-radius: 3px; background: var(--blue); box-shadow: 18px 18px 0 var(--coral); transform: rotate(1.2deg); }
+.instrument::before { content: ""; position: absolute; inset: 12px; pointer-events: none; border: 1px solid rgba(20,32,30,.18); }
+.instrumentTop, .transport { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; font: 800 10px "Courier New", monospace; letter-spacing: .08em; }
+.recording { padding: 6px 9px; color: #fff; background: var(--coral); }
+.waveform { position: relative; z-index: 1; height: 250px; display: flex; align-items: center; justify-content: center; gap: 7px; }
+.waveform span { width: min(12px, 2vw); background: var(--ink); transform-origin: center; animation: breathe 2.8s ease-in-out infinite alternate; }
+.transport { justify-content: flex-start; gap: 9px; }
+.transport button { width: 34px; height: 34px; border: 1px solid var(--ink); border-radius: 50%; cursor: pointer; background: transparent; }
+.transport .play { color: white; background: var(--ink); }
+.timeline { height: 3px; flex: 1; margin-left: 12px; background: rgba(20,32,30,.25); }
+.timeline span { display: block; width: 38%; height: 100%; background: var(--ink); }
+
+.membership { width: min(1440px, 100%); margin: 0 auto; padding: 92px 42px; display: grid; grid-template-columns: 1fr minmax(390px, 520px); gap: 90px; color: var(--paper); background: var(--ink); }
+.membershipCopy h2 { margin: 17px 0 18px; font: 700 clamp(45px, 5vw, 76px)/.95 Georgia, serif; letter-spacing: -.055em; }
+.membershipCopy > p:not(.kicker) { max-width: 600px; color: #b6c1bd; line-height: 1.65; }
+.membershipCopy ul { margin: 32px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; list-style: none; }
+.membershipCopy li { display: flex; align-items: center; gap: 10px; font-size: 13px; text-transform: capitalize; }
+.membershipCopy li span { color: var(--mint); }
+.checkoutCard { padding: 34px; color: var(--ink); background: var(--cream); border-radius: 4px; box-shadow: 14px 14px 0 var(--mint); }
+.priceRow { display: flex; align-items: end; gap: 14px; padding-bottom: 25px; border-bottom: 1px solid rgba(20,32,30,.18); }
+.price { font: 700 72px/.8 Georgia, serif; letter-spacing: -.06em; }
+.price sup { font-size: 24px; vertical-align: top; }
+.priceRow > span:last-child { color: #66716e; font-size: 11px; line-height: 1.5; }
+.trial { margin: 15px 0; padding: 9px 12px; color: #176b49; background: rgba(157,226,194,.35); font-size: 12px; font-weight: 700; }
+.walletRow { margin-top: 20px; display: flex; align-items: center; gap: 9px; font: 11px "Courier New", monospace; }
+.walletRow button { margin-left: auto; border: 0; cursor: pointer; color: inherit; background: transparent; text-decoration: underline; }
+.checkoutButton { width: 100%; min-height: 52px; margin-top: 20px; border: 0; border-radius: 3px; cursor: pointer; color: white; background: var(--coral); font-size: 14px; font-weight: 900; transition: transform 150ms ease, box-shadow 150ms ease; }
+.checkoutButton:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 0 rgba(20,32,30,.15); }
+.checkoutButton:disabled { cursor: not-allowed; opacity: .48; }
+.success { margin-top: 20px; padding: 18px; display: flex; gap: 14px; align-items: center; color: #0f5e40; background: rgba(157,226,194,.35); }
+.successMark { width: 33px; height: 33px; display: grid; place-items: center; flex: none; border-radius: 50%; color: white; background: #1d9b64; font-weight: 900; }
+.success strong { display: block; }
+.success p { margin: 4px 0 0; font-size: 11px; }
+.error { margin: 14px 0 0; padding: 11px; color: #8f261c; background: #ffe0d9; font-size: 11px; line-height: 1.5; }
+.receipt { margin-top: 18px; display: flex; justify-content: space-between; gap: 15px; font: 10px "Courier New", monospace; }
+.receipt span { color: #697471; }
+.receipt a { color: #176b49; font-weight: 700; }
+.secureNote { margin: 18px 0 0; text-align: center; color: #717a77; font-size: 9px; letter-spacing: .05em; }
+
+.footer { width: min(1440px, 100%); margin: 0 auto; padding: 25px 42px; display: flex; justify-content: space-between; gap: 25px; color: #66716e; font: 10px "Courier New", monospace; }
+.footer a { color: var(--ink); font-weight: 800; }
+
+@keyframes breathe { from { transform: scaleY(.82); } to { transform: scaleY(1.08); } }
+
+@media (max-width: 960px) {
+  .integrationPanel { grid-template-columns: 1fr 1fr; }
+  .codeCard { grid-column: 1 / -1; }
+  .panelOpen { max-height: 850px; }
+  .hero { grid-template-columns: 1fr; padding-top: 55px; gap: 55px; }
+  .heroCopy h1 { max-width: 780px; }
+  .membership { grid-template-columns: 1fr; }
+  .checkoutCard { max-width: 600px; }
+}
+
+@media (max-width: 640px) {
+  .header { min-height: 68px; padding: 0 20px; }
+  .nav > a { display: none; }
+  .integrationToggle { font-size: 0; }
+  .integrationToggle::after { content: "Setup"; font-size: 12px; }
+  .integrationPanel { grid-template-columns: 1fr; padding-left: 20px; padding-right: 20px; }
+  .panelOpen { max-height: 1050px; }
+  .codeCard { grid-column: auto; }
+  .hero { min-height: auto; padding: 55px 20px 70px; grid-template-columns: 1fr; }
+  .heroCopy h1 { font-size: clamp(52px, 17vw, 76px); }
+  .instrument { min-height: 315px; padding: 17px; box-shadow: 10px 10px 0 var(--coral); }
+  .waveform { height: 190px; gap: 4px; }
+  .membership { padding: 70px 20px; grid-template-columns: minmax(0, 1fr); }
+  .membershipCopy ul { grid-template-columns: 1fr; }
+  .checkoutCard { min-width: 0; padding: 25px; box-shadow: 9px 9px 0 var(--mint); }
+  .price { font-size: 60px; }
+  .footer { padding: 23px 20px; flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .integrationPanel, .waveform span, .checkoutButton { animation: none; transition: none; }
+}

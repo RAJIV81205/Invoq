@@ -21,6 +21,7 @@ import { authenticate } from "../middleware/auth.js";
 import { asyncHandler } from "../middleware/error.js";
 import {
   buildSubscribeTxXdr,
+  buildSubscriptionApprovalTxXdr,
   buildCreateVaultTxXdr,
   wrapAndSubmit,
   verifyInnerTxSigner,
@@ -32,10 +33,72 @@ import {
 } from "../lib/db/index.js";
 import { invalidateEntitlementCache } from "../lib/cache/redis.js";
 import { getSubscription } from "../lib/stellar/registry.js";
+import { getPlan } from "../lib/stellar/registry.js";
 import { fromUnixSeconds } from "../lib/db/index.js";
 import { fireWebhook } from "../services/webhook.js";
 
 const router = Router();
+
+// POST /v1/checkout/build-approval-tx
+// body: { customerAddress: string, planId: string }
+router.post(
+  "/build-approval-tx",
+  authenticate(["sk", "pk"]),
+  asyncHandler(async (req, res) => {
+    const { developerAddress } = res.locals.auth;
+    const { customerAddress, planId } = req.body;
+
+    if (!customerAddress || !planId) {
+      res.status(400).json({ error: "customerAddress and planId required" });
+      return;
+    }
+
+    const plan = await getPlan(BigInt(planId));
+    if (!plan || plan.owner !== developerAddress) {
+      res.status(404).json({ error: "Plan not found" });
+      return;
+    }
+
+    const result = await buildSubscriptionApprovalTxXdr({
+      customerAddress,
+      amountPerPeriod: plan.price_usdc,
+    });
+    if (result.error) {
+      res.status(502).json({ error: result.error });
+      return;
+    }
+
+    res.json({ xdr: result.xdr });
+  }),
+);
+
+// POST /v1/checkout/submit-approval-tx
+// body: { signedXdr: string, customerAddress: string }
+router.post(
+  "/submit-approval-tx",
+  authenticate(["sk", "pk"]),
+  asyncHandler(async (req, res) => {
+    const { signedXdr, customerAddress } = req.body;
+    if (!signedXdr || !customerAddress) {
+      res.status(400).json({ error: "signedXdr and customerAddress required" });
+      return;
+    }
+
+    const passphrase = getNetworkPassphrase();
+    if (!verifyInnerTxSigner(signedXdr, customerAddress, passphrase)) {
+      res.status(400).json({ error: "Transaction signature does not match customerAddress" });
+      return;
+    }
+
+    const result = await wrapAndSubmit(signedXdr);
+    if (result.error) {
+      res.status(502).json({ error: result.error });
+      return;
+    }
+
+    res.json({ txHash: result.txHash });
+  }),
+);
 
 // POST /v1/checkout/build-tx
 // body: { customerAddress: string, planId: string }
@@ -43,10 +106,17 @@ router.post(
   "/build-tx",
   authenticate(["sk", "pk"]),
   asyncHandler(async (req, res) => {
+    const { developerAddress } = res.locals.auth;
     const { customerAddress, planId } = req.body;
 
     if (!customerAddress || !planId) {
       res.status(400).json({ error: "customerAddress and planId required" });
+      return;
+    }
+
+    const plan = await getPlan(BigInt(planId));
+    if (!plan || plan.owner !== developerAddress) {
+      res.status(404).json({ error: "Plan not found" });
       return;
     }
 

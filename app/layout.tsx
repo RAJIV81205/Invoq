@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 
 const inter = Inter({
@@ -7,9 +7,14 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
-const playfair = Playfair_Display({
+const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-playfair",
+  variable: "--font-geist",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
 });
 
 export const metadata: Metadata = {
@@ -28,7 +33,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`h-full scroll-smooth antialiased ${inter.variable} ${playfair.variable}`}>
+    <html lang="en" className={`h-full scroll-smooth antialiased ${inter.variable} ${geist.variable} ${geistMono.variable}`}>
       <body className="min-h-full flex flex-col text-[var(--foreground)]" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
         {children}
       </body>

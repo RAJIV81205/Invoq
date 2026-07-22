@@ -3,6 +3,7 @@ import StatusPill from "@/app/components/StatusPill";
 import NewKeyButton from "./NewKeyButton";
 import RevokeButton from "./RevokeButton";
 import type { DashboardApiKey } from "@/app/lib/types";
+import Link from "next/link";
 
 export default async function KeysPage() {
   const session = await requireSession();
@@ -20,7 +21,12 @@ export default async function KeysPage() {
               Secret (sk_) keys for your server. Publishable (pk_) keys for the browser.
             </p>
           </div>
-          <NewKeyButton />
+          <div className="flex flex-wrap gap-2">
+            <Link href="/demo-store" target="_blank" className="button-secondary px-4 py-2 text-sm">
+              Open demo storefront
+            </Link>
+            <NewKeyButton />
+          </div>
         </div>
       </div>
 

@@ -22,21 +22,22 @@ export default function Topbar({
   }
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-[rgba(5,8,22,0.7)] px-6 py-4 backdrop-blur-xl">
-      <div>
-        <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Workspace</div>
-        <div className="text-sm text-[var(--foreground)]">
-          Signed in as <span className="font-medium">{email}</span>
+    <header className="sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-[var(--border)] bg-[rgba(10,11,15,0.82)] px-4 backdrop-blur-xl sm:px-6 lg:px-8">
+      <div className="flex items-center gap-3">
+        <div className="md:hidden grid h-8 w-8 place-items-center rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] font-data text-[0.6rem] font-bold">IQ</div>
+        <div>
+          <div className="text-[0.64rem] uppercase tracking-[0.16em] text-[var(--muted-deep)]">Production workspace</div>
+          <div className="text-xs text-[var(--muted)]">{email}</div>
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <span className="hidden sm:inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-mono text-[var(--foreground)]">
-          <span className="h-2 w-2 rounded-full bg-[var(--accent)] shadow-[0_0_20px_rgba(67,242,186,0.75)]" />
+        <span className="hidden sm:inline-flex items-center gap-2 rounded-[9px] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 font-data text-xs text-[var(--foreground)]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_12px_var(--accent)]" />
           {short(stellarAddress)}
         </span>
         <button
           onClick={logout}
-          className="button-secondary px-4 py-2 text-sm"
+          className="button-secondary px-3.5 py-1.5 text-xs"
         >
           Log out
         </button>

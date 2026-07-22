@@ -43,6 +43,31 @@ export class CheckoutResource {
 
   // ── Subscription flow ─────────────────────────────────────────────────────
 
+  /** Build the USDC allowance transaction required for subscription billing. */
+  async buildSubscriptionApprovalTx(
+    customerAddress: string,
+    planId: string | number | bigint,
+  ): Promise<BuildTxResult> {
+    this.assertAddress("customerAddress", customerAddress);
+    return this.http.post<BuildTxResult>("/v1/checkout/build-approval-tx", {
+      customerAddress,
+      planId: String(planId),
+    });
+  }
+
+  /** Submit a customer-signed USDC allowance transaction. */
+  async submitSubscriptionApproval(
+    signedXdr: string,
+    customerAddress: string,
+  ): Promise<SubmitTxResult> {
+    this.assertXdr(signedXdr);
+    this.assertAddress("customerAddress", customerAddress);
+    return this.http.post<SubmitTxResult>("/v1/checkout/submit-approval-tx", {
+      signedXdr,
+      customerAddress,
+    });
+  }
+
   /**
    * Build an unsigned subscribe transaction XDR.
    * Pass the XDR to your wallet for signing, then call submitSubscription().
@@ -102,6 +127,10 @@ export class CheckoutResource {
     customerAddress: string,
     planId: string | number | bigint,
   ): Promise<SubmitTxResult> {
+    const { xdr: approvalXdr } = await this.buildSubscriptionApprovalTx(customerAddress, planId);
+    const signedApprovalXdr = await wallet.signTransaction(approvalXdr);
+    await this.submitSubscriptionApproval(signedApprovalXdr, customerAddress);
+
     const { xdr } = await this.buildSubscribeTx(customerAddress, planId);
     const signedXdr = await wallet.signTransaction(xdr);
     return this.submitSubscription(signedXdr, customerAddress, planId);

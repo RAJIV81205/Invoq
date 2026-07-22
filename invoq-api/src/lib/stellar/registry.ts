@@ -34,6 +34,24 @@ export type SubStatus =
   | "Cancelled"
   | "Expired";
 
+const SUB_STATUSES: readonly SubStatus[] = [
+  "Trialing",
+  "Active",
+  "Paused",
+  "GracePeriod",
+  "Cancelled",
+  "Expired",
+];
+
+/** scValToNative decodes fieldless contract enums as `["Variant"]`. */
+export function normalizeSubStatus(value: unknown): SubStatus {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  if (typeof candidate === "string" && SUB_STATUSES.includes(candidate as SubStatus)) {
+    return candidate as SubStatus;
+  }
+  throw new Error(`Unknown subscription status returned by contract: ${JSON.stringify(value)}`);
+}
+
 export interface PlanConfig {
   plan_id: bigint;
   name: string;
@@ -225,7 +243,11 @@ export async function getSubscription(
     method: "get_subscription",
     args: [toScAddress(customer)],
   });
-  return result.value ?? null;
+  if (!result.value) return null;
+  return {
+    ...result.value,
+    status: normalizeSubStatus(result.value.status),
+  };
 }
 
 export async function renewSubscription(params: {
@@ -270,7 +292,11 @@ export async function checkEntitlementFull(
     method: "check_entitlement_full",
     args: [toScAddress(customer), toScString(feature)],
   });
-  return result.value ?? null;
+  if (!result.value) return null;
+  return {
+    ...result.value,
+    status: normalizeSubStatus(result.value.status),
+  };
 }
 
 export async function isSubscribed(customer: string): Promise<boolean> {

@@ -51,7 +51,11 @@ import {
   toScI128,
   toScStringVec,
 } from "./client.js";
-import { SPEND_POLICY_CONTRACT_ADDRESS } from "../../config.js";
+import {
+  BILLING_CYCLE_CONTRACT_ADDRESS,
+  SPEND_POLICY_CONTRACT_ADDRESS,
+  USDC_SAC_ADDRESS,
+} from "../../config.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -68,6 +72,12 @@ const MIN_INCLUSION_FEE_STROOPS = (Number(BASE_FEE) * 10).toString();
  * Provides cushion against minor surge-pricing spikes without over-spending.
  */
 const FEE_BUMP_UPLIFT_PCT = 20n; // 20 %
+
+/**
+ * Allowance lifetime below Stellar Testnet's 3,110,400-ledger maximum.
+ * SAC allowance expirations use ledger sequence, not wall-clock time.
+ */
+const USDC_ALLOWANCE_LEDGERS = 3_000_000;
 
 // ─── Fee-bump helpers ─────────────────────────────────────────────────────────
 
@@ -444,7 +454,7 @@ export async function buildSubscribeTxXdr(
 ): Promise<{ xdr: string | null; error: string | null }> {
   const rpc        = getRpc();
   const passphrase = getNetworkPassphrase();
-  const contractId = process.env.BILLING_CONTRACT_ID;
+  const contractId = BILLING_CYCLE_CONTRACT_ADDRESS;
 
   if (!contractId) {
     return { xdr: null, error: "BILLING_CONTRACT_ID not configured" };
@@ -480,6 +490,71 @@ export async function buildSubscribeTxXdr(
     const simResult = await rpc.simulateTransaction(tx);
     if (SorobanRpc.Api.isSimulationError(simResult)) {
       return { xdr: null, error: `Transaction simulation failed: ${simResult.error}` };
+    }
+
+    const assembled = SorobanRpc.assembleTransaction(tx, simResult).build();
+    return { xdr: assembled.toXDR(), error: null };
+  } catch (err) {
+    return { xdr: null, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Builds the USDC SAC approval required before BillingCycle can debit a
+ * customer. Amount covers 13 billing periods; expiry stays inside network TTL.
+ */
+export async function buildSubscriptionApprovalTxXdr(params: {
+  customerAddress: string;
+  amountPerPeriod: bigint;
+}): Promise<{ xdr: string | null; error: string | null }> {
+  const rpc = getRpc();
+  const passphrase = getNetworkPassphrase();
+
+  if (!BILLING_CYCLE_CONTRACT_ADDRESS) {
+    return { xdr: null, error: "BILLING_CYCLE_CONTRACT_ADDRESS not configured" };
+  }
+  if (!USDC_SAC_ADDRESS) {
+    return { xdr: null, error: "USDC_SAC_ADDRESS not configured" };
+  }
+
+  try {
+    let customerAccount;
+    try {
+      customerAccount = await rpc.getAccount(params.customerAddress);
+    } catch {
+      return {
+        xdr: null,
+        error: "Customer Stellar account not found. Please fund your wallet first.",
+      };
+    }
+
+    const latestLedger = await rpc.getLatestLedger();
+    const expirationLedger = Math.min(
+      0xffff_ffff,
+      latestLedger.sequence + USDC_ALLOWANCE_LEDGERS,
+    );
+    const allowanceAmount = params.amountPerPeriod * 13n;
+    const usdc = new Contract(USDC_SAC_ADDRESS);
+
+    const tx = new TransactionBuilder(customerAccount, {
+      fee: MIN_INCLUSION_FEE_STROOPS,
+      networkPassphrase: passphrase,
+    })
+      .addOperation(
+        usdc.call(
+          "approve",
+          toScAddress(params.customerAddress),
+          toScAddress(BILLING_CYCLE_CONTRACT_ADDRESS),
+          toScI128(allowanceAmount),
+          xdr.ScVal.scvU32(expirationLedger),
+        ),
+      )
+      .setTimeout(300)
+      .build();
+
+    const simResult = await rpc.simulateTransaction(tx);
+    if (SorobanRpc.Api.isSimulationError(simResult)) {
+      return { xdr: null, error: `USDC approval simulation failed: ${simResult.error}` };
     }
 
     const assembled = SorobanRpc.assembleTransaction(tx, simResult).build();

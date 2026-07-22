@@ -7,7 +7,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="mx-auto grid min-h-screen max-w-7xl gap-10 px-6 py-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:px-8">
         <div className="hidden lg:block">
           <Link href="/" className="inline-flex items-center gap-3">
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-[var(--brand)] via-[#8fb3ff] to-[var(--accent)] text-[0.68rem] font-black text-slate-950 shadow-lg shadow-cyan-500/20">
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-glow)] text-[0.68rem] font-black text-white shadow-lg shadow-violet-500/20">
               IQ
             </div>
             <div>

@@ -85,6 +85,13 @@ async function ensureIndexes(db: Db): Promise<void> {
       { key: { method: 1 }, name: "tx_log_method_idx" },
     ]),
   ]);
+
+  // Older builds stored fieldless Soroban enums as `["Active"]`. Repair them
+  // once on connection so analytics/jobs can use normal string comparisons.
+  await db.collection("subscription_cache").updateMany(
+    { status: { $type: "array" } },
+    [{ $set: { status: { $arrayElemAt: ["$status", 0] } } }],
+  );
 }
 
 async function getDb(): Promise<Db> {

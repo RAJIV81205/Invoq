@@ -18,7 +18,7 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-40 w-full px-4 pt-4 sm:px-5 sm:pt-5">
       <div className="mx-auto flex max-w-7xl items-center justify-between rounded-full border border-white/10 bg-[rgba(5,8,22,0.58)] px-4 py-3 shadow-2xl shadow-slate-950/20 backdrop-blur-2xl sm:px-5">
         <Link href="/" className="flex items-center gap-2 group">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-[var(--brand)] via-[#8fb3ff] to-[var(--accent)] text-[0.7rem] font-black text-slate-950 shadow-lg shadow-cyan-500/20 glow">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-glow)] text-[0.7rem] font-black text-white shadow-lg shadow-violet-500/20 glow">
             IQ
           </div>
           <span className="text-lg font-semibold tracking-[-0.03em]">Invoq</span>

@@ -28,32 +28,34 @@ const ICONS: Record<string, React.ReactNode> = {
 export default function Sidebar() {
   const pathname = usePathname();
   return (
-    <aside className="hidden md:flex w-72 shrink-0 flex-col border-r border-white/10 bg-[rgba(5,8,22,0.56)] backdrop-blur-xl">
-      <div className="px-5 py-6 border-b border-white/10">
+    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-[var(--border)] bg-[#0d0e13]">
+      <div className="px-5 py-5 border-b border-[var(--border)]">
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-[var(--brand)] via-[#8fb3ff] to-[var(--accent)] text-[0.68rem] font-black text-slate-950 shadow-lg shadow-cyan-500/20">
+          <div className="relative grid h-9 w-9 place-items-center rounded-[10px] border border-white/10 bg-[var(--surface-elevated)] font-data text-[0.64rem] font-bold text-white">
+            <span className="absolute inset-x-1.5 bottom-0 h-px bg-gradient-to-r from-[var(--brand)] to-[var(--brand-glow)]" />
             IQ
           </div>
           <div>
             <div className="text-sm font-semibold tracking-[-0.02em]">Invoq</div>
-            <div className="text-xs text-[var(--muted)]">Billing ops</div>
+            <div className="text-[0.68rem] text-[var(--muted)]">Settlement OS</div>
           </div>
         </Link>
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <div className="px-5 pb-2 pt-5 text-[0.62rem] font-medium uppercase tracking-[0.18em] text-[var(--muted-deep)]">Operations</div>
+      <nav className="flex-1 px-3 py-1 space-y-1">
         {nav.map((item) => {
           const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm transition ${
+              className={`relative flex items-center gap-3 rounded-[10px] px-3.5 py-2.5 text-[0.82rem] transition ${
                 active
-                  ? "bg-white/8 text-[var(--foreground)] shadow-sm ring-1 ring-white/8"
-                  : "text-[var(--muted)] hover:bg-white/4 hover:text-[var(--foreground)]"
+                  ? "overflow-hidden bg-[var(--surface-elevated)] text-[var(--foreground)] before:absolute before:inset-y-2 before:left-0 before:w-[2px] before:rounded-full before:bg-gradient-to-b before:from-[var(--brand)] before:to-[var(--brand-glow)] before:shadow-[0_0_12px_var(--brand)]"
+                  : "text-[var(--muted)] hover:bg-white/[0.03] hover:text-[var(--foreground)]"
               }`}
             >
-              <svg className={`w-4 h-4 ${active ? "text-[var(--brand-glow)]" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-4 h-4 ${active ? "text-[#8f83ff]" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {ICONS[item.icon]}
               </svg>
               {item.label}
@@ -61,8 +63,9 @@ export default function Sidebar() {
           );
         })}
       </nav>
-      <div className="border-t border-white/10 px-4 py-4 text-xs text-[var(--muted)]">
-        <Link href="/" className="hover:text-[var(--foreground)]">← Back to site</Link>
+      <div className="m-3 rounded-xl border border-[var(--border)] bg-[var(--card)] p-3">
+        <div className="mb-2 flex items-center gap-2 text-[0.68rem] text-[var(--muted)]"><span className="h-1.5 w-1.5 rounded-full bg-[var(--success)] shadow-[0_0_10px_var(--success)]" /> Systems operational</div>
+        <Link href="/" className="text-xs text-[var(--foreground)] hover:text-[var(--brand-glow)]">View product site →</Link>
       </div>
     </aside>
   );
