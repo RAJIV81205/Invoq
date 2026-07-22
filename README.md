@@ -393,6 +393,23 @@ CUSTOMER_ADDRESS=G... \
 bash scripts/test-api.sh
 ```
 
+## User feedback
+
+The following UI/UX improvements are tracked against recent user feedback. Each item is limited to the product experience; commit links point to the implementation history.
+
+| User feedback | UI/UX solution | Commit ID |
+|---|---|---|
+| “The browser keeps suggesting old values in forms.” | Disabled browser autocomplete on sign-in, sign-up, key, secret, and plan inputs. | [`2b0e85e`](https://github.com/RAJIV81205/invoq/commit/2b0e85e) |
+| “I cannot tell whether a page is still loading.” | Added dashboard loading states so navigation and data fetches have immediate visual feedback. | [`2b0e85e`](https://github.com/RAJIV81205/invoq/commit/2b0e85e) |
+| “Password entry needs a quick visibility check.” | Added show/hide password controls to authentication forms. | [`60ba8f4`](https://github.com/RAJIV81205/invoq/commit/60ba8f4) |
+| “Form errors are easy to miss.” | Added clearer inline validation and actionable field-level error messaging. | [`60ba8f4`](https://github.com/RAJIV81205/invoq/commit/60ba8f4) |
+| “The dashboard cards feel inconsistent.” | Standardized KPI card spacing, hierarchy, and visual treatment across dashboard views. | [`88de72a`](https://github.com/RAJIV81205/invoq/commit/88de72a) |
+| “Empty pages do not tell me what to do next.” | Refined empty states with clearer copy and next-step affordances. | [`88de72a`](https://github.com/RAJIV81205/invoq/commit/88de72a) |
+| “Dialogs feel disconnected from the page.” | Improved modal layout, spacing, and close/action affordances for a consistent interaction pattern. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
+| “Navigation should make the current area obvious.” | Refined sidebar and navbar states so active sections and destinations are easier to scan. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
+| “I need to understand checkout before connecting a wallet.” | Added a clearer demo storefront and billing hero card to explain the checkout flow visually. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
+| “The README needs visual proof of the product.” | Added a landing-page and storefront screenshot foundation for the product overview. | [`53f3c10`](https://github.com/RAJIV81205/invoq/commit/53f3c10) |
+
 ## Deployment order
 
 1. Deploy `SubscriptionRegistry` and initialize it.
