@@ -1,572 +1,440 @@
 # Invoq
 
-> Programmable Subscription Billing Infrastructure for Stellar
+### Programmable subscription billing and usage infrastructure for Stellar
 
-Invoq is a production-ready subscription billing platform built on Soroban smart contracts and Stellar USDC.
+[![Stellar](https://img.shields.io/badge/Stellar-Testnet-7D5CFF?logo=stellar&logoColor=white)](https://stellar.org/)
+[![Soroban SDK](https://img.shields.io/badge/Soroban_SDK-25-111827)](https://developers.stellar.org/docs/build/smart-contracts)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-For a practical setup and usage walkthrough, see [HOW_TO_USE.md](./HOW_TO_USE.md).
+Invoq gives developers one stack for recurring Stellar USDC payments, subscription state, feature entitlements, usage metering, prepaid vaults, spending policies, webhooks, and billing operations. It combines four Soroban contracts with an Express API, a TypeScript SDK, and a Next.js control plane.
 
-It enables developers, SaaS platforms, AI APIs, and agentic applications to implement:
+> [!IMPORTANT]
+> Current deployments target **Stellar Testnet**. Contracts have not been presented as independently audited for Mainnet use. Testnet USDC has no monetary value.
 
-- Recurring billing
-- Usage metering
-- Entitlement management
-- Spend controls
-- Prepaid escrow systems
+## Links
 
-Built on top of **x402**, **Soroban**, and **Stellar USDC**, Invoq provides the missing subscription and billing layer for the Stellar ecosystem.
-
----
-
-# Why Invoq?
-
-x402 solves **per-request payments**.
-
-But modern SaaS and AI products still need:
-
-- Monthly subscriptions
-- Usage quotas
-- Free trials
-- Grace periods
-- Billing automation
-- Customer lifecycle management
-- Enterprise spend controls
-
-Invoq fills that gap.
-
-Think:
-
-> Stripe Billing — but fully on-chain and programmable on Stellar.
-
----
-
-# Core Architecture
-
-Invoq consists of four modular Soroban smart contracts:
-
-| Contract | Responsibility |
+| Resource | Link |
 |---|---|
-| `SubscriptionRegistry` | Subscription plans, entitlements, usage state |
-| `BillingCycle` | Recurring renewals, SAC billing automation |
-| `SpendPolicy` | Enterprise spend limits and AI agent controls |
-| `EscrowVault` | Prepaid balances and usage-based billing |
+| Live application | [invoq.rajivdubey.dev](https://invoq.rajivdubey.dev) |
+| Product walkthrough | [Watch on Google Drive](https://drive.google.com/file/d/1DbE18YM2nTtJ-pW2BgrkW0e25yTwzFUV/view?usp=sharing) |
+| Source repository | [github.com/RAJIV81205/Invoq](https://github.com/RAJIV81205/Invoq) |
+| Practical setup guide | [HOW_TO_USE.md](./HOW_TO_USE.md) |
+| Project documentation | [Invoq_Project_Documentation.md](./Invoq_Project_Documentation.md) |
+| Contract specification | [Invoq_Contract_Specification.md](./Invoq_Contract_Specification.md) |
+| SDK reference | [packages/invoq-sdk/README.md](./packages/invoq-sdk/README.md) |
+| Dashboard reference | [app/dashboard/README.md](./app/dashboard/README.md) |
 
-Each contract owns a separate domain and communicates via cross-contract calls.
+## Demo video
 
----
+> [Watch the complete Invoq product walkthrough →](https://drive.google.com/file/d/1DbE18YM2nTtJ-pW2BgrkW0e25yTwzFUV/view?usp=sharing)
 
-# Features
+## Screenshots
 
-## Subscription Billing
+<table>
+  <tr>
+    <td align="center" width="50%"><strong>Screenshot 1</strong><br /><sub>Product landing page</sub><br /><br /><em>Add screenshot here</em></td>
+    <td align="center" width="50%"><strong>Screenshot 2</strong><br /><sub>Developer dashboard</sub><br /><br /><em>Add screenshot here</em></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%"><strong>Screenshot 3</strong><br /><sub>Plan and API key setup</sub><br /><br /><em>Add screenshot here</em></td>
+    <td align="center" width="50%"><strong>Screenshot 4</strong><br /><sub>Customer checkout</sub><br /><br /><em>Add screenshot here</em></td>
+  </tr>
+</table>
 
-- Monthly & annual plans
-- Free trials
-- Grace periods
-- Automatic renewals
-- Plan upgrades & downgrades
-- Usage-based billing
-- Hybrid billing models
-- Cancellation flows
+## What Invoq does
 
----
+- Creates flat-rate or metered plans on-chain.
+- Collects recurring Stellar USDC payments without holding developer revenue.
+- Stores subscription lifecycle and usage state in Soroban.
+- Answers low-latency feature-entitlement checks through Redis-backed API routes.
+- Buffers usage and flushes counters on-chain.
+- Supports trials, cancellation, grace periods, payment retries, and renewal jobs.
+- Provides prepaid customer/developer vaults for usage-based products.
+- Enforces agent daily limits, transaction limits, and destination allowlists.
+- Emits signed webhooks for billing and vault events.
+- Gives developers a dashboard for plans, customers, usage, keys, webhooks, and vaults.
 
-## Usage Metering
+## How it fits together
 
-- Real-time usage tracking
-- Per-plan quotas
-- Threshold alerts
-- Metered API billing
-- Usage rollover support
-
----
-
-## Enterprise Spend Controls
-
-- Daily spending caps
-- Per-transaction limits
-- Wallet allowlists
-- AI agent budget enforcement
-- OpenZeppelin smart account integration
-
----
-
-## Escrow Billing
-
-- Prepaid USDC balances
-- Auto top-ups
-- Low-balance alerts
-- Real-time debit accounting
-- Refundable unused balances
-
----
-
-## Developer Experience
-
-- REST API
-- JavaScript / TypeScript SDK
-- Next.js dashboard
-- Webhooks
-- Revenue analytics
-- Usage analytics
-
----
-
-# Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Smart Contracts | Rust + Soroban SDK |
-| Backend | Node.js |
-| Database | MongoDB |
-| Cache Layer | Redis |
-| Queue System | BullMQ |
-| Dashboard | Next.js + TailwindCSS |
-| Blockchain SDK | Stellar SDK |
-| Infrastructure | Docker + Railway / Fly.io |
-
----
-
-# Smart Contracts
-
-# 1. SubscriptionRegistry
-
-The on-chain source of truth for:
-
-- Plans
-- Subscriptions
-- Entitlements
-- Usage counters
-- Feature flags
-
-## Responsibilities
-
-- Create and manage plans
-- Store customer subscriptions
-- Check feature access
-- Track usage
-- Handle subscription lifecycle
-
-## Main Functions
-
-```rust
-initialize()
-create_plan()
-update_plan()
-create_subscription()
-check_entitlement()
-get_subscription()
-renew_subscription()
-cancel_subscription()
-increment_usage()
+```mermaid
+flowchart LR
+    U[Developer or customer] --> W[Next.js + SDK]
+    W --> A[Invoq API]
+    A --> C[Soroban contracts]
+    C --> S[Stellar USDC]
+    A --> D[(MongoDB + Redis)]
 ```
 
-## Subscription States
+The developer creates a plan. A customer connects Freighter and signs two transactions: USDC allowance approval, then subscription creation. `BillingCycle` transfers the first payment directly to the plan owner and asks `SubscriptionRegistry` to store the subscription. The API mirrors confirmed state into MongoDB so the customer and recurring-revenue estimate appear in the dashboard.
 
-```rust
-Active
-Trialing
-Paused
-GracePeriod
-Cancelled
-Expired
-```
-
----
-
-# 2. BillingCycle
-
-Handles:
-
-- Recurring billing
-- Automated renewals
-- Grace periods
-- SAC USDC transfers
-- Payment retries
-
-## Responsibilities
-
-- Process subscription renewals
-- Trigger USDC SAC debits
-- Handle failed payments
-- Retry grace-period renewals
-- Expire unpaid subscriptions
-
-## Main Functions
-
-```rust
-initialize()
-initiate_subscription()
-process_renewals()
-retry_failed_payment()
-expire_grace_periods()
-update_grace_period()
-```
-
----
-
-# 3. SpendPolicy
-
-Enterprise-grade spending controls for AI agents.
-
-## Features
-
-- Daily spend caps
-- Transaction limits
-- Wallet allowlists
-- Agent policy mapping
-- OpenZeppelin smart account integration
-
-## Main Functions
-
-```rust
-initialize()
-create_policy()
-check_spend()
-record_spend()
-update_policy()
-deactivate_policy()
-```
-
----
-
-# 4. EscrowVault
-
-The prepaid billing engine for usage-based APIs.
-
-## Features
-
-- USDC deposits
-- Usage debiting
-- Auto top-up support
-- Low-balance notifications
-- Refundable balances
-
-## Main Functions
-
-```rust
-initialize()
-create_vault()
-deposit()
-debit_vault()
-withdraw()
-update_threshold()
-```
-
----
-
-# System Architecture
+## Payment model
 
 ```text
-┌─────────────────────────────┐
-│      Developer Dashboard    │
-│      Next.js + Analytics    │
-└──────────────┬──────────────┘
-               │
-┌──────────────▼──────────────┐
-│        Backend Services     │
-│     Node.js + Webhooks      │
-└──────────────┬──────────────┘
-               │
-┌──────────────▼──────────────┐
-│     Subscription Engine     │
-│ MongoDB + Redis + Jobs      │
-└──────────────┬──────────────┘
-               │
-┌──────────────▼──────────────┐
-│     Soroban Smart Contracts │
-│ Registry │ Billing │ Vault  │
-└──────────────┬──────────────┘
-               │
-┌──────────────▼──────────────┐
-│      Stellar + x402 + USDC  │
-└─────────────────────────────┘
+Customer wallet ── Stellar USDC ──> Developer plan-owner wallet
+                         │
+                         └── Subscription state recorded on Soroban
 ```
 
----
+Invoq does not custody flat-rate subscription revenue. The developer already owns received USDC; there is no Invoq withdrawal step. Prepaid usage billing is different: funds deposited into `EscrowVault` remain in the contract until debited or refunded.
 
-# Billing Flow
+Amounts use seven decimal places:
 
-## 1. Developer Creates Plan
-
-The developer defines:
-
-- Pricing
-- Billing interval
-- Usage limits
-- Feature flags
-- Trial duration
-
-The plan is stored on-chain in `SubscriptionRegistry`.
-
----
-
-## 2. Customer Subscribes
-
-The customer:
-
-- Connects their Stellar wallet
-- Approves USDC SAC allowance
-- Initiates subscription
-
-`BillingCycle` creates the subscription.
-
----
-
-## 3. Entitlement Verification
-
-On every API request:
-
-```ts
-checkEntitlement(customer, feature)
+```text
+1 USDC = 10,000,000 stroops
 ```
 
-The backend verifies whether the customer has access.
+## Components
 
----
+| Component | Responsibility | Technology |
+|---|---|---|
+| Dashboard and storefront | Onboarding, plans, customers, analytics, checkout demo | Next.js 16, React 19, Tailwind CSS 4 |
+| REST API | Auth, orchestration, transaction building, fee sponsorship | Express 5, TypeScript |
+| SDK | Browser checkout and server resources | TypeScript |
+| Persistent database | Developers, API keys, cached subscriptions, webhook delivery | MongoDB 7 |
+| Cache and queues | Entitlements, plan snapshots, usage buffers, jobs | Redis 7, BullMQ |
+| Contracts | Billing, state, policy, escrow | Rust, Soroban SDK 25 |
+| Settlement | USDC transfers and transaction finality | Stellar / SAC |
 
-## 4. Usage Metering
+## Smart contracts
 
-The backend records usage:
+All addresses below are current Testnet deployments from `.env.example`.
 
-```ts
-recordUsage(customer, units)
+| Contract | Address | Role |
+|---|---|---|
+| `SubscriptionRegistry` | [`CC5F...U3PF`](https://stellar.expert/explorer/testnet/contract/CC5FVK42PNUGPQZRYDYW7EVRIQIW2GTNPF6TVMZBBVPCLLDMJZLKU3PF) | Plans, subscriptions, entitlements, usage |
+| `BillingCycle` | [`CAR6...UUOR`](https://stellar.expert/explorer/testnet/contract/CAR6HPIXMNI4B4GONOWCXLN2N7VHH45FEX7IM2JDARR7XZHETNVDUUOR) | Initial payment, renewals, retries, grace periods |
+| `SpendPolicy` | [`CDTL...HFPG`](https://stellar.expert/explorer/testnet/contract/CDTLW43XT55X5FZB3PPC5Y7UG6PSYC4LW3ZED23YIEIVDXVOT72QHFPG) | Agent budgets and destination controls |
+| `EscrowVault` | [`CBAN...2LLO`](https://stellar.expert/explorer/testnet/contract/CBANJOGMJZ3CAIHX45UWUTDUVXZIMUYOZPXNHYZLKKHZBQ5ZAR6L2LLO) | Prepaid balances, debits, refunds |
+| Testnet USDC SAC | [`CBIE...DAMA`](https://stellar.expert/explorer/testnet/contract/CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA) | Stellar asset contract used for settlement |
+
+### 1. SubscriptionRegistry
+
+Canonical on-chain source for plan configuration, customer subscription status, feature access, periods, and usage counters. `BillingCycle` is configured as its operator.
+
+| Function | Access | Purpose |
+|---|---|---|
+| `initialize(admin, usdc_sac)` | Once | Configure admin and USDC SAC |
+| `transfer_admin(new_admin)` | Admin | Transfer contract administration |
+| `set_operator(operator)` | Admin | Authorize BillingCycle or another writer |
+| `revoke_operator()` | Admin | Remove current operator |
+| `get_admin()` | Read | Return admin |
+| `get_operator()` | Read | Return configured operator |
+| `create_plan(owner, name, price, interval, trial, limit, features)` | Owner-signed | Create developer-owned plan |
+| `create_plan_for(caller, owner, ...)` | Admin/operator | Create plan for a developer |
+| `update_plan(caller, plan_id, ...)` | Owner/admin/operator | Update mutable plan fields |
+| `deactivate_plan(caller, plan_id)` | Owner/admin/operator | Block new subscriptions |
+| `reactivate_plan(caller, plan_id)` | Owner/admin/operator | Reopen plan |
+| `get_plan(plan_id)` | Read | Return plan configuration |
+| `plan_count()` | Read | Return total plan count |
+| `create_subscription(caller, customer, plan_id)` | Admin/operator | Store confirmed subscription |
+| `update_status(caller, customer, status)` | Admin/operator | Change lifecycle status |
+| `renew_subscription(caller, customer, start, end)` | Admin/operator | Advance period and reset usage |
+| `cancel_subscription(caller, customer, immediate)` | Customer/admin/operator | Cancel now or at period end |
+| `get_subscription(customer)` | Read | Return subscription record |
+| `check_entitlement(customer, feature)` | Read | Return feature-access boolean |
+| `check_entitlement_full(customer, feature)` | Read | Return access plus plan and usage context |
+| `is_subscribed(customer)` | Read | Return non-terminal subscription state |
+| `increment_usage(caller, customer, units)` | Admin/operator | Add usage units |
+| `increment_usage_batch(caller, entries)` | Admin/operator | Add usage for a batch |
+
+Subscription states:
+
+```text
+Trialing → Active → GracePeriod → Active
+             │           │
+             ├→ Paused   └→ Expired
+             └→ Cancelled
 ```
 
-Usage counters are stored on-chain.
+### 2. BillingCycle
 
----
+Customer-facing payment entry point and admin-driven renewal engine. Paid subscriptions require a Stellar USDC SAC allowance for this contract. The client SDK builds and submits approval before subscription creation.
 
-## 5. Automatic Renewal
+| Function | Access | Purpose |
+|---|---|---|
+| `initialize(admin, registry_id, usdc_sac, grace_seconds)` | Once | Configure dependencies and grace period |
+| `transfer_admin(new_admin)` | Admin | Transfer administration |
+| `get_admin()` | Read | Return admin |
+| `get_grace_period()` | Read | Return grace duration |
+| `initiate_subscription(customer, plan_id)` | Customer-signed | Charge first payment and create subscription |
+| `process_renewals(customers)` | Admin | Process due subscriptions in a batch |
+| `expire_grace_periods(customers)` | Admin | Expire unpaid grace-period subscriptions |
+| `retry_payment(customer)` | Admin | Retry one failed renewal |
+| `retry_failed_payment(customer)` | Admin | Compatibility alias for retry |
+| `set_grace_period(seconds)` | Admin | Set grace duration |
+| `update_grace_period(seconds)` | Admin | Compatibility alias for grace update |
+| `get_grace_record(customer)` | Read | Return failed-payment context |
+| `get_registry_id()` | Read | Return registry address |
+| `get_usdc_sac()` | Read | Return USDC SAC address |
 
-At billing period expiry:
+### 3. SpendPolicy
 
-- `BillingCycle` debits customer USDC
-- Subscription renews automatically
-- Webhooks fire
-- Usage resets
+Standalone policy layer for wallets or automated agents. A policy can limit daily spend, per-transaction spend, allowed destinations, and governed agent addresses.
 
----
+| Function | Access | Purpose |
+|---|---|---|
+| `initialize(admin)` | Once | Configure admin |
+| `transfer_admin(caller, new_admin)` | Admin | Transfer administration |
+| `get_admin()` | Read | Return admin |
+| `create_policy(owner, daily_limit, tx_limit, allowlist, agents)` | Owner-signed | Create policy |
+| `update_policy(caller, daily_limit, tx_limit, allowlist, agents)` | Owner/admin | Replace policy fields |
+| `deactivate_policy(caller)` | Owner/admin | Disable enforcement |
+| `reactivate_policy(caller)` | Owner/admin | Restore enforcement |
+| `check_spend(agent, destination, amount, timestamp)` | Read | Return detailed decision |
+| `is_spend_allowed(agent, destination, amount, timestamp)` | Read | Return decision boolean |
+| `record_spend(caller, agent, amount)` | Owner/admin | Add daily spend |
+| `get_policy(owner)` | Read | Return policy |
+| `get_agent_owner(agent)` | Read | Resolve agent to owner |
+| `get_daily_spent(owner, timestamp)` | Read | Return daily total |
+| `get_daily_limit_remaining(owner, timestamp)` | Read | Return remaining budget |
 
-## 6. Failed Payments
+### 4. EscrowVault
 
-If payment fails:
+Prepaid ledger keyed by customer/developer pair. Customers fund and control withdrawals; the admin metering service can debit usage. Closing a vault refunds its remaining balance.
 
-- Subscription enters `GracePeriod`
-- Retry attempts begin
-- Final expiration occurs after grace timeout
+| Function | Access | Purpose |
+|---|---|---|
+| `initialize(admin, usdc_sac)` | Once | Configure admin and asset |
+| `transfer_admin(caller, new_admin)` | Admin | Transfer administration |
+| `get_admin()` | Read | Return admin |
+| `get_usdc_sac()` | Read | Return asset contract |
+| `create_vault(caller, customer, developer, deposit, threshold, topup)` | Customer-signed | Create and fund vault |
+| `deposit(caller, customer, developer, amount)` | Customer-signed | Add funds |
+| `debit_vault(caller, customer, developer, amount, description)` | Admin | Charge usage |
+| `withdraw(caller, customer, developer, amount)` | Customer-signed | Withdraw unused balance |
+| `close_vault(caller, customer, developer)` | Customer-signed | Close and refund |
+| `update_threshold(caller, customer, developer, threshold, topup)` | Customer-signed | Change alert/top-up settings |
+| `get_vault(customer, developer)` | Read | Return vault record |
+| `vault_exists(customer, developer)` | Read | Check vault existence |
+| `get_balance(customer, developer)` | Read | Return vault balance |
 
----
+## Contract error codes
 
-# Webhooks
+Soroban surfaces failures as `Error(Contract, #N)`. Codes are contract-specific.
 
-Invoq emits signed webhooks for all major billing events.
-
-## Supported Events
-
-| Event | Description |
+| Contract | Codes |
 |---|---|
-| `subscription.created` | Customer subscribed |
-| `payment.renewed` | Renewal successful |
-| `payment.failed` | Renewal failed |
-| `subscription.cancelled` | Subscription cancelled |
-| `subscription.upgraded` | Plan upgraded |
-| `subscription.downgraded` | Plan downgraded |
-| `usage.threshold` | Usage nearing limit |
-| `trial.ending` | Trial ending soon |
-| `vault.low_balance` | Escrow balance low |
+| Registry | `1 AlreadyInitialized`, `2 NotInitialized`, `10 Unauthorized`, `20 PlanNotFound`, `21 PlanInactive`, `22 InvalidPlanName`, `23 InvalidInterval`, `24 TooManyFeatures`, `25 InvalidPrice`, `26 AlreadyInactive`, `27 AlreadyActive`, `30 SubscriptionNotFound`, `31 AlreadySubscribed`, `32 InvalidTransition`, `33 InvalidPeriod`, `34 SubscriptionNotActive`, `35 AlreadyCancelled`, `40 ZeroUnits`, `41 BatchTooLarge` |
+| Billing | `1 AlreadyInitialized`, `2 NotInitialized`, `10 Unauthorized`, `20 BatchTooLarge`, `30 InvalidGracePeriod`, `31 NotInGracePeriod`, `40 SubscriptionNotFound`, `41 AlreadySubscribed`, `42 PlanNotActive`, `43 InsufficientAllowance`, `44 PaymentFailed`, `45 InvalidPeriod` |
+| Spend policy | `1 AlreadyInitialized`, `2 NotInitialized`, `10 Unauthorized`, `20 PolicyAlreadyExists`, `21 PolicyNotFound`, `22 AlreadyInactive`, `23 AlreadyActive`, `24 TooManyAgents`, `25 TooManyAllowlist`, `30 InvalidAmount` |
+| Vault | `1 AlreadyInitialized`, `2 NotInitialized`, `10 Unauthorized`, `20 VaultAlreadyExists`, `21 VaultNotFound`, `30 DepositTooSmall`, `31 InsufficientVaultBalance`, `32 InvalidAmount`, `33 PaymentFailed`, `34 InvalidThreshold` |
 
----
+## Standards and protocol choices
+
+- **Soroban** provides contract execution and storage.
+- **Stellar Asset Contract (SAC)** exposes Stellar USDC to contracts.
+- **Stellar fee-bump transactions** let Invoq sponsor XLM network fees while the customer still authorizes payment.
+- **x402** informs the product's programmable-payment positioning; subscriptions and lifecycle logic are implemented by Invoq.
+- **No ERC-20 contract is used.** ERC standards belong to EVM chains; Invoq settles through Stellar USDC SAC.
+
+## API and key model
+
+API routes are served under `/v1`.
+
+| Area | Prefix | Examples |
+|---|---|---|
+| Developer auth/profile | `/v1/developers` | Signup, login, current profile |
+| API keys | `/v1/keys` | Mint publishable/secret keys, revoke |
+| Plans | `/v1/plans` | Create, list, update, deactivate |
+| Checkout | `/v1/checkout` | Status, USDC approval, subscribe, vault XDRs |
+| Subscriptions | `/v1/subscriptions` | List, detail, history, pause, resume, cancel |
+| Entitlements | `/v1/entitlement` | Cached boolean or full access context |
+| Usage | `/v1/usage` | Record and query consumption |
+| Vault | `/v1/vault` | Balances, deposit, debit, withdraw, close |
+| Spend policy | `/v1/spend-policies` | Policy lifecycle and spend checks |
+| Webhooks | `/v1/webhooks` | Endpoints and delivery log |
+
+Key types:
+
+| Prefix | Location | Capability |
+|---|---|---|
+| `sk_live_...` / `sk_test_...` | Server only | Administrative API access |
+| `pk_live_...` / `pk_test_...` | Browser/mobile | Checkout and safe reads |
+
+Secret keys are SHA-256 hashed before database storage and shown in plaintext only once. Never place an `sk_` key in client code.
+
+## SDK example
+
+This repository contains the workspace SDK at `packages/invoq-sdk`.
+
+```ts
+import InvoqClient from "invoq-sdk/client";
+import { signXdr } from "./wallet";
+
+const invoq = new InvoqClient({
+  apiKey: process.env.NEXT_PUBLIC_INVOQ_KEY!, // pk_ only
+  baseUrl: process.env.NEXT_PUBLIC_INVOQ_API_URL!,
+});
+
+const wallet = {
+  signTransaction: (xdr: string) => signXdr(xdr),
+};
+
+await invoq.checkout.subscribe(wallet, customerAddress, planId);
+```
+
+For a paid plan, `subscribe()` requests two wallet signatures:
+
+1. Approve BillingCycle to spend the configured USDC allowance.
+2. Initiate the subscription and first payment.
+
+Server-side usage:
+
+```ts
+import InvoqServer from "invoq-sdk/server";
+
+const invoq = new InvoqServer({
+  apiKey: process.env.INVOQ_SECRET_KEY!,
+  baseUrl: process.env.INVOQ_API_URL!,
+});
+
+const allowed = await invoq.entitlement.isAllowed(customerAddress, "audio_generation");
+if (!allowed) throw new Error("Upgrade required");
+
+await invoq.usage.record(customerAddress, 25);
+```
+
+## Webhook events
+
+```text
+subscription.created       subscription.cancelled
+subscription.upgraded      subscription.downgraded
+payment.renewed            payment.failed
+payment.retry_succeeded    usage.threshold
+trial.ending               vault.low_balance
+vault.created              vault.closed
+```
+
+Payloads are signed using HMAC-SHA256 and delivered with `X-Invoq-Signature`. Store the endpoint signing secret when it is created; it is shown once.
+
+## Local development
+
+### Requirements
+
+- Node.js 20+ or Bun
+- Rust toolchain with `wasm32v1-none`
+- Stellar CLI
+- Docker with Compose
+- Freighter configured for Stellar Testnet
+- A funded Testnet developer wallet and customer wallet
+
+### 1. Install dependencies
+
+```bash
+npm install
+npm --prefix invoq-api install
+npm --prefix packages/invoq-sdk install
+```
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env
+cp invoq-api/.env.example invoq-api/.env
+```
+
+Set `STELLAR_ADMIN_SECRET` in `invoq-api/.env`. Keep secret keys out of Git.
+
+### 3. Start MongoDB and Redis
+
+```bash
+docker compose up -d
+```
+
+### 4. Start API and dashboard
+
+Terminal one:
+
+```bash
+npm --prefix invoq-api run dev
+```
+
+Terminal two:
+
+```bash
+npm run dev
+```
+
+Open the dashboard after both processes report that they are ready.
+
+For smoother demos without development compilation delays:
+
+```bash
+npm run build
+npm start
+```
+
+## Build and verification
+
+```bash
+# Dashboard
+npm run typecheck
+npm run lint
+npm run build
+
+# API
+npm --prefix invoq-api run build
 
 # SDK
+npm --prefix packages/invoq-sdk run typecheck
+npm --prefix packages/invoq-sdk run build
 
-## JavaScript / TypeScript SDK
-
-```bash
-npm install invoq
-```
-
-Example:
-
-```ts
-import { Invoq } from "invoq"
-
-const invoq = new Invoq({
-  apiKey: process.env.INVOQ_API_KEY
-})
-
-await invoq.subscriptions.create({
-  customer: walletAddress,
-  planId: 1
-})
-```
-
----
-
-# Security Model
-
-- All subscription state stored on-chain
-- USDC settlement via Stellar SAC
-- Non-custodial architecture
-- HMAC-signed webhooks
-- Redis-backed entitlement caching
-- Smart contract audits before mainnet
-- Deterministic billing state machine
-
----
-
-# Why Stellar?
-
-Invoq leverages Stellar because of:
-
-- Near-zero transaction costs
-- 5-second finality
-- Native USDC ecosystem
-- Soroban smart contracts
-- Global off-ramp support
-- High throughput for recurring billing
-
----
-
-# Target Users
-
-Invoq is designed for:
-
-- AI API developers
-- SaaS builders
-- Data providers
-- Agent marketplaces
-- MCP tool builders
-- Developer tooling companies
-
----
-
-# Example Use Cases
-
-## AI API Platform
-
-- Free tier
-- Pro subscription
-- Enterprise billing
-- Token-based metering
-
----
-
-## Agent Marketplace
-
-- x402 pay-per-request
-- Monthly subscription bundles
-- Hybrid billing
-
----
-
-## Enterprise Data Provider
-
-- Escrow-based usage billing
-- Monthly invoices
-- Real-time balance tracking
-
----
-
-# Getting Started
-
-## 1. Deploy the contracts
-
-```bash
-# Build all four Soroban contracts
+# Contracts
+cargo test --workspace
 npm run compile
+```
 
-# Deploy to testnet (Registry + BillingCycle, then wires them together)
+API smoke tests require a running API, `jq`, a valid API key, and a funded customer wallet:
+
+```bash
+API_KEY=sk_live_... \
+CUSTOMER_ADDRESS=G... \
+bash scripts/test-api.sh
+```
+
+## Deployment order
+
+1. Deploy `SubscriptionRegistry` and initialize it.
+2. Deploy `BillingCycle` with Registry and USDC SAC addresses.
+3. Call `SubscriptionRegistry.set_operator(BillingCycle)`.
+4. Deploy `SpendPolicy`.
+5. Deploy `EscrowVault` with the USDC SAC address.
+6. Configure the same addresses in API and dashboard environments.
+
+Build and deployment scripts:
+
+```bash
+npm run compile
 npm run deploy
-
-# Optional: deploy SpendPolicy and EscrowVault
 npm run deploy:spend-policy
 npm run deploy:escrow-vault
 ```
 
-The deploy script prints the contract addresses. Paste them into `invoq-api/.env` and `lib/config.ts` (see the "Contract addresses" section below).
+## Repository map
 
-## 2. Start the API
-
-```bash
-cd invoq-api
-cp .env.example .env       # fill in MONGODB_URI, Redis config, admin key
-docker compose up -d mongo redis
-bun install
-bun run dev                # http://localhost:3001
+```text
+app/                         Next.js site, auth, dashboard, demo checkout
+invoq-api/                   Express API, MongoDB/Redis adapters, workers
+packages/invoq-sdk/          Browser and server TypeScript SDK
+contracts/subscription-registry/
+contracts/blling-cycle/      BillingCycle crate; directory keeps legacy spelling
+contracts/spend-policy/
+contracts/escrow-vault/
+scripts/                     Build, deployment, and smoke-test scripts
 ```
 
-For local development, use `MONGODB_URI=mongodb://127.0.0.1:27017/invoq` and
-`REDIS_URL=redis://127.0.0.1:6379`. Redis powers cache, queues, and jobs.
+## Security notes
 
-In another terminal, smoke-test it:
+- Customer and developer actions use wallet authorization.
+- Invoq's admin fee-bump signature pays transaction fees but cannot replace customer authorization.
+- Checkout verifies the inner transaction signer before submission.
+- Publishable and secret keys have separate endpoint permissions.
+- Webhook signatures must be checked against the raw request body.
+- Contract addresses and network passphrases must match across API, SDK, and wallet.
+- One non-terminal subscription per customer is supported by the current Registry data model.
+- Mainnet deployment should follow independent contract review, key-management hardening, monitoring, and incident-response preparation.
 
-```bash
-API_KEY=sk_live_... CUSTOMER_ADDRESS=G... bash scripts/test-api.sh
-```
+## License
 
-## 3. Open the dashboard
-
-```bash
-cd ..                       # back to the repo root
-bun install
-cp .env.example .env        # fill in NEXT_PUBLIC_INVOQ_API_URL
-bun run dev                 # http://localhost:3000
-```
-
-Visit:
-
-- `http://localhost:3000`         — landing page
-- `http://localhost:3000/signup`  — create a developer + receive your first secret API key
-- `http://localhost:3000/login`   — sign in with your email and password
-- `http://localhost:3000/dashboard` — overview, plans, customers, webhooks, usage, vault, API keys, settings
-- `http://localhost:3000/test`    — end-to-end test suite (Freighter wallet required)
-
-## 4. Use the SDK
-
-```bash
-npm install invoq-sdk
-```
-
-```typescript
-import { InvoqServer } from "invoq-sdk/server";
-const invoq = new InvoqServer({ apiKey: process.env.INVOQ_KEY! });
-const { entitled } = await invoq.entitlement.check(customer, "api:pro");
-```
-
-The dashboard goes through a BFF (`app/api/[...path]/route.ts`) that injects the session's API key. Secret keys are never exposed to the browser.
-
-## 5. Contract addresses
-
-The repo ships with testnet addresses in `invoq-api/src/config.ts` and `lib/config.ts`. For your own deployment, replace the constants with the addresses your `npm run deploy` printed.
-
-| Contract            | Testnet address |
-| ------------------- | --------------- |
-| SubscriptionRegistry | `CC5FVK42PNUGPQZRYDYW7EVRIQIW2GTNPF6TVMZBBVPCLLDMJZLKU3PF` |
-| BillingCycle         | `CAR6HPIXMNI4B4GONOWCXLN2N7VHH45FEX7IM2JDARR7XZHETNVDUUOR` |
-| SpendPolicy          | `CDTLW43XT55X5FZB3PPC5Y7UG6PSYC4LW3ZED23YIEIVDXVOT72QHFPG` |
-| EscrowVault          | `CBANJOGMJZ3CAIHX45UWUTDUVXZIMUYOZPXNHYZLKKHZBQ5ZAR6L2LLO` |
-| USDC SAC             | `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA` |
-
----
-
-# API endpoints
-
-The full REST surface is documented in `Invoq_Contract_Specification.md` and exercised by `scripts/test-api.sh`. Highlights:
-
-- `POST /v1/developers/signup` & `POST /v1/developers/login` — self-custodied onboarding
-- `GET  /v1/developers/me` & `PATCH /v1/developers/me` — developer profile
-- `POST /v1/plans` (admin-signed) & `POST /v1/plans/build-tx` (developer-signed) — plan lifecycle
-- `POST /v1/checkout/{build,submit}-tx` — subscription signup flow
-- `GET  /v1/entitlement?customer=…&feature=…` — Redis-cached entitlement check
-- `POST /v1/usage/record` — buffered usage metering
-- `GET  /v1/subscriptions` & `GET /v1/subscriptions/:customer/history` — subscription state
-- `POST /v1/subscriptions/:customer/pause` & `/resume` — lifecycle control
-- `GET  /v1/vault/balances` — all vaults for the developer
-- `POST /v1/vault/{build,submit}-deposit-tx` — customer deposits USDC
-- `POST /v1/spend-policies/build-tx` & `/submit-tx` — owner-signed enterprise budget policies
-- `GET  /v1/spend-policies/:owner` — read enterprise budget policies
-- `POST /v1/spend-policies/check` — public read-only gate
-- `POST /v1/keys/{secret,publishable}` & `DELETE /v1/keys/:id` — API key management
-
-Webhooks fired by the platform: `subscription.created`, `subscription.cancelled`, `payment.renewed`, `payment.failed`, `payment.retry_succeeded`, `usage.threshold`, `trial.ending`, `vault.created`, `vault.low_balance`.
-
+No repository-level license file is currently included. Add a license before redistributing or accepting external contributions.
