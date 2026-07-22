@@ -85,13 +85,14 @@ export default function SignupPage() {
           is stored as a secure hash; your first secret key is shown only once.
         </p>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
+        <form onSubmit={onSubmit} autoComplete="off" className="mt-6 space-y-4">
           <div>
             <label className="mb-2 block text-sm font-medium" htmlFor="name">
               Name
             </label>
             <input
               id="name"
+              autoComplete="off"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -114,7 +115,7 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="input-shell pr-20"
                 placeholder="Create a 12–256 character password"
-                autoComplete="new-password"
+                autoComplete="off"
               />
               <button
                 type="button"
@@ -151,7 +152,7 @@ export default function SignupPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="input-shell pr-20"
                 placeholder="Re-enter your password"
-                autoComplete="new-password"
+                autoComplete="off"
               />
               <button
                 type="button"
@@ -179,6 +180,7 @@ export default function SignupPage() {
             </label>
             <input
               id="email"
+              autoComplete="off"
               type="email"
               required
               value={email}

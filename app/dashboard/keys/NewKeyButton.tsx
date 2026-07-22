@@ -62,6 +62,7 @@ export default function NewKeyButton() {
             <div>
               <label className="block text-sm font-medium mb-2">Name (optional)</label>
               <input
+                autoComplete="off"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. production-server"

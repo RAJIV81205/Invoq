@@ -88,6 +88,7 @@ export default function NewPlanButton({ stellarAddress }: { stellarAddress: stri
             <div>
               <label className="block text-sm font-medium mb-2">Name</label>
               <input
+                autoComplete="off"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="API Pro"
@@ -99,6 +100,7 @@ export default function NewPlanButton({ stellarAddress }: { stellarAddress: stri
                 <label className="block text-sm font-medium mb-2">Price (USDC)</label>
                 <input
                   type="number"
+                  autoComplete="off"
                   step="0.01"
                   min="0"
                   value={priceUsdc}
@@ -110,6 +112,7 @@ export default function NewPlanButton({ stellarAddress }: { stellarAddress: stri
                 <label className="block text-sm font-medium mb-2">Interval (days)</label>
                 <input
                   type="number"
+                  autoComplete="off"
                   min="1"
                   value={intervalDays}
                   onChange={(e) => setIntervalDays(e.target.value)}
@@ -120,6 +123,7 @@ export default function NewPlanButton({ stellarAddress }: { stellarAddress: stri
                 <label className="block text-sm font-medium mb-2">Trial (days, 0 = none)</label>
                 <input
                   type="number"
+                  autoComplete="off"
                   min="0"
                   value={trialDays}
                   onChange={(e) => setTrialDays(e.target.value)}
@@ -130,6 +134,7 @@ export default function NewPlanButton({ stellarAddress }: { stellarAddress: stri
                 <label className="block text-sm font-medium mb-2">Usage limit (0 = unlimited)</label>
                 <input
                   type="number"
+                  autoComplete="off"
                   min="0"
                   value={usageLimit}
                   onChange={(e) => setUsageLimit(e.target.value)}
@@ -140,6 +145,7 @@ export default function NewPlanButton({ stellarAddress }: { stellarAddress: stri
             <div>
               <label className="block text-sm font-medium mb-2">Features (comma-separated)</label>
               <input
+                autoComplete="off"
                 value={features}
                 onChange={(e) => setFeatures(e.target.value)}
                 placeholder="api_access, webhooks, export"

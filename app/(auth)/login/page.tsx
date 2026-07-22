@@ -52,13 +52,14 @@ function LoginForm() {
         Use your developer account email and password to sign in.
       </p>
 
-      <form onSubmit={onSubmit} className="mt-6 space-y-4">
+      <form onSubmit={onSubmit} autoComplete="off" className="mt-6 space-y-4">
         <div>
           <label className="mb-2 block text-sm font-medium" htmlFor="email">
             Email
           </label>
           <input
             id="email"
+            autoComplete="off"
             type="email"
             required
             value={email}
@@ -82,7 +83,7 @@ function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               className="input-shell pr-20"
               placeholder="Enter your 12–256 character password"
-              autoComplete="current-password"
+              autoComplete="off"
             />
             <button
               type="button"

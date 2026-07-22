@@ -35,6 +35,7 @@ export default function PayoutAddressForm({ initial, isValid }: { initial: strin
   return (
     <div className="space-y-3">
       <input
+        autoComplete="off"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         pattern="^G[0-9A-Z]{55}$"

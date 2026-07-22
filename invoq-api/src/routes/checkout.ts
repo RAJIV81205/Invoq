@@ -39,6 +39,40 @@ import { fireWebhook } from "../services/webhook.js";
 
 const router = Router();
 
+// GET /v1/checkout/status?customerAddress=G...
+// Browser-safe preflight used to prevent duplicate subscription attempts.
+router.get(
+  "/status",
+  authenticate(["sk", "pk"]),
+  asyncHandler(async (req, res) => {
+    const { developerAddress } = res.locals.auth;
+    const customerAddress = req.query.customerAddress as string;
+    if (!customerAddress) {
+      res.status(400).json({ error: "customerAddress required" });
+      return;
+    }
+
+    const subscription = await getSubscription(customerAddress);
+    if (!subscription) {
+      res.json({ subscribed: false, status: null, planId: null });
+      return;
+    }
+
+    const plan = await getPlan(subscription.plan_id);
+    if (!plan || plan.owner !== developerAddress) {
+      res.json({ subscribed: false, status: null, planId: null });
+      return;
+    }
+
+    const subscribed = subscription.status !== "Cancelled" && subscription.status !== "Expired";
+    res.json({
+      subscribed,
+      status: subscription.status,
+      planId: subscription.plan_id.toString(),
+    });
+  }),
+);
+
 // POST /v1/checkout/build-approval-tx
 // body: { customerAddress: string, planId: string }
 router.post(

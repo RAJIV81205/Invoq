@@ -3,6 +3,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { API_BASE_URL } from "./config";
 
 export interface DashboardSession {
@@ -16,7 +17,7 @@ export interface DashboardSession {
   };
 }
 
-export async function getSession(): Promise<DashboardSession | null> {
+const getSessionForRequest = cache(async (): Promise<DashboardSession | null> => {
   const store = await cookies();
   const apiKey = store.get("invoq_session")?.value;
   if (!apiKey) return null;
@@ -34,6 +35,10 @@ export async function getSession(): Promise<DashboardSession | null> {
   } catch {
     return null;
   }
+});
+
+export async function getSession(): Promise<DashboardSession | null> {
+  return getSessionForRequest();
 }
 
 export async function requireSession(): Promise<DashboardSession> {

@@ -75,6 +75,7 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
   const [plan, setPlan] = useState<Plan | null>(null);
   const [walletAddress, setWalletAddress] = useState("");
   const [checkoutState, setCheckoutState] = useState<CheckoutState>("idle");
+  const [existingSubscriptionStatus, setExistingSubscriptionStatus] = useState("");
   const [error, setError] = useState("");
   const [txHash, setTxHash] = useState("");
 
@@ -119,6 +120,7 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
   async function applyIntegration() {
     setError("");
     setTxHash("");
+    setExistingSubscriptionStatus("");
     if (!config.publishableKey.startsWith("pk_")) {
       setError("Use a publishable key beginning with pk_. Secret keys must never be placed in browser code.");
       return;
@@ -177,6 +179,17 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
         setWalletAddress(customer);
       }
 
+      const current = await apiRequest<{
+        subscribed: boolean;
+        status: string | null;
+        planId: string | null;
+      }>(`/v1/checkout/status?customerAddress=${encodeURIComponent(customer)}`);
+      if (current.subscribed) {
+        setExistingSubscriptionStatus(current.status ?? "Active");
+        setCheckoutState("success");
+        return;
+      }
+
       setCheckoutState("approving");
       const approval = await apiRequest<{ xdr: string }>("/v1/checkout/build-approval-tx", {
         customerAddress: customer,
@@ -207,6 +220,11 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
       setTxHash(submitted.txHash);
       setCheckoutState("success");
     } catch (err) {
+      if (err instanceof Error && err.message.includes("Contract, #41")) {
+        setExistingSubscriptionStatus("Active");
+        setCheckoutState("success");
+        return;
+      }
       setCheckoutState("idle");
       setError(errorMessage(err));
     }
@@ -249,6 +267,7 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
           <label>
             API base URL
             <input
+              autoComplete="off"
               value={config.apiBaseUrl}
               onChange={(event) => setConfig({ ...config, apiBaseUrl: event.target.value })}
               placeholder="http://localhost:3001"
@@ -258,16 +277,17 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
             Publishable key
             <input
               type="password"
+              autoComplete="off"
               value={config.publishableKey}
               onChange={(event) => setConfig({ ...config, publishableKey: event.target.value })}
               placeholder="pk_live_…"
-              autoComplete="off"
             />
           </label>
           <label className={styles.planField}>
             Plan ID
             <input
               inputMode="numeric"
+              autoComplete="off"
               value={config.planId}
               onChange={(event) => setConfig({ ...config, planId: event.target.value })}
               placeholder="1"
@@ -359,8 +379,12 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
             <div className={styles.success}>
               <span className={styles.successMark}>✓</span>
               <div>
-                <strong>Membership active</strong>
-                <p>Invoq recorded this customer and subscription.</p>
+                <strong>{existingSubscriptionStatus ? `Membership ${existingSubscriptionStatus.toLowerCase()}` : "Membership active"}</strong>
+                <p>
+                  {existingSubscriptionStatus
+                    ? "This wallet already has a subscription. No duplicate charge was made."
+                    : "Invoq recorded this customer and subscription."}
+                </p>
               </div>
             </div>
           ) : (

@@ -29,6 +29,11 @@ import {
 import { getAdminPublicKey } from "../lib/stellar/client.js";
 import { listSubscriptionCacheByDeveloperAddress } from "../lib/db/index.js";
 import {
+  getCachedDeveloperPlans,
+  invalidateDeveloperPlans,
+  setCachedDeveloperPlans,
+} from "../lib/cache/redis.js";
+import {
   buildPlanTxXdr,
   buildUpdatePlanTxXdr,
   buildDeactivatePlanTxXdr,
@@ -38,6 +43,7 @@ import {
 
 const router = Router();
 type SerializedPlan = ReturnType<typeof serializePlan>;
+const planLoaders = new Map<string, Promise<SerializedPlan[]>>();
 
 // ─── POST /v1/plans — admin-signed create_plan_for (no wallet signature) ────
 //
@@ -68,6 +74,8 @@ router.post(
 
     if (result.error) { res.status(502).json({ error: result.error }); return; }
 
+    await invalidateDeveloperPlans(developerAddress);
+
     // Use the returned planId if the contract returned one; otherwise
     // derive from getPlanCount.
     const planId = result.planId !== null
@@ -93,35 +101,7 @@ router.get(
       return;
     }
 
-    const count = Number(await getPlanCount());
-    if (count === 0) {
-      res.json({ plans: [] });
-      return;
-    }
-
-    const BATCH = 25;
-    const out: SerializedPlan[] = [];
-    for (let i = 1; i <= count; i += BATCH) {
-      const ids: bigint[] = [];
-      for (let j = i; j < i + BATCH && j <= count; j++) ids.push(BigInt(j));
-      const plans = await Promise.all(ids.map(id => getPlan(id).catch(() => null)));
-      for (const p of plans) {
-        if (p && p.owner === developerAddress) {
-          out.push({
-            plan_id:           p.plan_id.toString(),
-            name:              p.name,
-            price_usdc:        p.price_usdc.toString(),
-            interval_seconds:  p.interval_seconds.toString(),
-            trial_seconds:     p.trial_seconds.toString(),
-            usage_limit:       p.usage_limit.toString(),
-            features:          p.features,
-            active:            p.active,
-            owner:             p.owner,
-            created_at:        p.created_at.toString(),
-          });
-        }
-      }
-    }
+    const out = (await loadDeveloperPlans(developerAddress)).map((plan) => ({ ...plan }));
 
     // Annotate with active-subscriber counts from cache
     const cacheRows = await listSubscriptionCacheByDeveloperAddress(developerAddress);
@@ -216,6 +196,8 @@ router.post(
       return;
     }
 
+    await invalidateDeveloperPlans(res.locals.auth.developerAddress);
+
     // Derive planId from the on-chain plan count after successful submission.
     // NOTE: We read AFTER confirmation so we get the final count.
     // In high-concurrency deployments, prefer returning planId from the
@@ -278,6 +260,9 @@ router.post(
       return;
     }
 
+
+    await invalidateDeveloperPlans(res.locals.auth.developerAddress);
+
     res.json({ txHash: result.txHash });
   })
 );
@@ -326,6 +311,9 @@ router.post(
       res.status(502).json({ error: result.error });
       return;
     }
+
+
+    await invalidateDeveloperPlans(res.locals.auth.developerAddress);
 
     res.json({ txHash: result.txHash });
   })
@@ -376,6 +364,9 @@ router.post(
       return;
     }
 
+
+    await invalidateDeveloperPlans(res.locals.auth.developerAddress);
+
     res.json({ txHash: result.txHash });
   })
 );
@@ -392,6 +383,15 @@ router.get(
     if (planId === null) {
       res.status(400).json({ error: "planId must be a positive integer" });
       return;
+    }
+
+    if (developerAddress) {
+      const cached = await getCachedDeveloperPlans<SerializedPlan[]>(developerAddress);
+      const cachedPlan = cached?.find((item) => item.plan_id === planId.toString());
+      if (cachedPlan) {
+        res.json(cachedPlan);
+        return;
+      }
     }
 
     const plan = await requireOwnedPlan(planId, developerAddress);
@@ -442,6 +442,9 @@ router.patch(
       return;
     }
 
+
+    await invalidateDeveloperPlans(developerAddress);
+
     res.json({ txHash: result.txHash });
   })
 );
@@ -471,6 +474,9 @@ router.delete(
       return;
     }
 
+
+    await invalidateDeveloperPlans(developerAddress);
+
     res.json({ txHash: result.txHash });
   })
 );
@@ -499,6 +505,9 @@ router.post(
       res.status(502).json({ error: result.error });
       return;
     }
+
+
+    await invalidateDeveloperPlans(developerAddress);
 
     res.json({ txHash: result.txHash });
   })
@@ -539,4 +548,38 @@ function serializePlan(plan: Awaited<ReturnType<typeof getPlan>> extends infer T
     usage_limit:      plan.usage_limit.toString(),
     created_at:       plan.created_at.toString(),
   };
+}
+
+async function loadDeveloperPlans(developerAddress: string): Promise<SerializedPlan[]> {
+  const cached = await getCachedDeveloperPlans<SerializedPlan[]>(developerAddress);
+  if (cached) return cached;
+
+  const existing = planLoaders.get(developerAddress);
+  if (existing) return existing;
+
+  const loader = (async () => {
+    const count = Number(await getPlanCount());
+    if (count === 0) return [];
+
+    const BATCH = 25;
+    const plans: SerializedPlan[] = [];
+    for (let i = 1; i <= count; i += BATCH) {
+      const ids: bigint[] = [];
+      for (let j = i; j < i + BATCH && j <= count; j++) ids.push(BigInt(j));
+      const batch = await Promise.all(ids.map((id) => getPlan(id).catch(() => null)));
+      for (const plan of batch) {
+        if (plan?.owner === developerAddress) plans.push(serializePlan(plan));
+      }
+    }
+
+    await setCachedDeveloperPlans(developerAddress, plans);
+    return plans;
+  })();
+
+  planLoaders.set(developerAddress, loader);
+  try {
+    return await loader;
+  } finally {
+    planLoaders.delete(developerAddress);
+  }
 }

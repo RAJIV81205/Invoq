@@ -67,6 +67,7 @@ export function getRedisConnectionConfig() {
 
 const ENTITLEMENT_TTL_SECONDS = 10;
 const USAGE_BUFFER_TTL_SECONDS = 300;
+const DEVELOPER_PLANS_TTL_SECONDS = 60;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Key builders
@@ -87,7 +88,49 @@ const keys = {
 
   trialWarned: (customer: string) =>
     `trial_warned:${customer}`,
+
+  developerPlans: (developerAddress: string) =>
+    `plans:${developerAddress}`,
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Developer plan list cache
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getCachedDeveloperPlans<T>(developerAddress: string): Promise<T | null> {
+  try {
+    const value = await redis().get(keys.developerPlans(developerAddress));
+    if (!value) return null;
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+}
+
+export async function setCachedDeveloperPlans(
+  developerAddress: string,
+  plans: unknown,
+): Promise<void> {
+  try {
+    await redis().set(
+      keys.developerPlans(developerAddress),
+      JSON.stringify(plans),
+      "EX",
+      DEVELOPER_PLANS_TTL_SECONDS,
+    );
+  } catch {
+    // Cache outage must not break plan reads.
+  }
+}
+
+export async function invalidateDeveloperPlans(developerAddress?: string | null): Promise<void> {
+  if (!developerAddress) return;
+  try {
+    await redis().del(keys.developerPlans(developerAddress));
+  } catch {
+    // Cache outage must not turn a confirmed on-chain mutation into an error.
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Entitlement cache

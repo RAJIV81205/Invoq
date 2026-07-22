@@ -9,15 +9,16 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const { customerAddress } = await params;
   const session = await requireSession();
 
-  const [subRes, histRes] = await Promise.all([
-    apiFetch(session, `/v1/subscriptions/${customerAddress}`),
-    apiFetch(session, `/v1/subscriptions/${customerAddress}/history`),
-  ]);
-
-  if (subRes.status === 404) notFound();
-  const sub: OnChainSubscription | null = subRes.ok ? await subRes.json() : null;
-  const hist: { events: WebhookDelivery[]; transactions: unknown[] } =
-    histRes.ok ? await histRes.json() : { events: [], transactions: [] };
+  const histRes = await apiFetch(session, `/v1/subscriptions/${customerAddress}/history`);
+  if (histRes.status === 404) notFound();
+  const hist: {
+    subscription: OnChainSubscription | null;
+    events: WebhookDelivery[];
+    transactions: unknown[];
+  } = histRes.ok
+    ? await histRes.json()
+    : { subscription: null, events: [], transactions: [] };
+  const sub = hist.subscription;
 
   return (
     <div className="space-y-6">

@@ -1,11 +1,10 @@
-import { requireSession, apiFetch } from "@/app/lib/auth-cookie";
+import { requireSession } from "@/app/lib/auth-cookie";
 import PayoutAddressForm from "./PayoutAddressForm";
 import { StrKey } from "@stellar/stellar-sdk";
 
 export default async function SettingsPage() {
   const session = await requireSession();
-  const res = await apiFetch(session, "/v1/developers/me");
-  const me = res.ok ? await res.json() : session.developer;
+  const me = session.developer;
 
   const isValidPayout = me.payoutAddress ? StrKey.isValidEd25519PublicKey(me.payoutAddress) : false;
 

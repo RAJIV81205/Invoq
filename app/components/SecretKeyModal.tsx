@@ -41,6 +41,7 @@ export default function SecretKeyModal({
       <label className="mt-4 flex items-center gap-3 text-sm text-[var(--foreground)]">
         <input
           type="checkbox"
+          autoComplete="off"
           checked={confirmed}
           onChange={(e) => setConfirmed(e.target.checked)}
           className="h-4 w-4 rounded border-white/20 bg-transparent"

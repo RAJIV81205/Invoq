@@ -82,6 +82,7 @@ export default function NewEndpointButton() {
             <div>
               <label className="block text-sm font-medium mb-2">URL (HTTPS)</label>
               <input
+                autoComplete="off"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://yourapp.com/webhooks/invoq"
@@ -95,6 +96,7 @@ export default function NewEndpointButton() {
                   <label key={ev} className="flex items-center gap-2 text-sm font-mono cursor-pointer rounded-xl px-2 py-1.5 hover:bg-white/5">
                     <input
                       type="checkbox"
+                      autoComplete="off"
                       checked={events.includes(ev)}
                       onChange={() => toggle(ev)}
                       className="h-3.5 w-3.5 rounded border-white/20 bg-transparent"
