@@ -102,6 +102,7 @@ body::before {
 @keyframes hero-reveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes orb-a { 0%, 100% { transform: translate3d(-6%, -4%, 0) scale(1); } 50% { transform: translate3d(9%, 7%, 0) scale(1.08); } }
 @keyframes orb-b { 0%, 100% { transform: translate3d(8%, 5%, 0) scale(1.06); } 50% { transform: translate3d(-7%, -8%, 0) scale(0.96); } }
+@keyframes stats-flow { from { left: -0.75rem; } to { left: calc(100% + 0.75rem); } }
 
 .glow {
   animation: pulse-glow 2.4s ease-in-out infinite;
@@ -162,6 +163,58 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-geist), sans-serif; }
 .hero-instrument { --tilt-x: 0deg; --tilt-y: 0deg; transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y)); transition: transform 260ms var(--ease-out), border-color 180ms ease; transform-style: preserve-3d; }
 .hero-instrument:hover { border-color: rgba(108, 92, 231, 0.35); }
 .hero-sparkline { stroke-dasharray: 1; stroke-dashoffset: 1; animation: rail-draw 900ms var(--ease-out) 440ms forwards; }
+
+.stats-ledger {
+  background:
+    radial-gradient(circle at 76% 72%, rgba(0, 212, 255, 0.08), transparent 34%),
+    rgba(19, 21, 28, 0.78);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.28);
+}
+
+.stats-cell + .stats-cell { border-top: 1px solid var(--border); }
+.stats-flow-cell { border-top: 1px solid var(--border); }
+
+.stats-rail {
+  position: relative;
+  height: 1px;
+  overflow: visible;
+  background: linear-gradient(90deg, rgba(108, 92, 231, 0.25), var(--brand-glow), rgba(0, 229, 160, 0.4));
+}
+
+.stats-rail::before,
+.stats-rail::after {
+  position: absolute;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  content: "";
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: var(--foreground);
+  box-shadow: 0 0 14px rgba(0, 212, 255, 0.55);
+}
+
+.stats-rail::before { left: 0; }
+.stats-rail::after { right: 0; }
+
+.stats-rail-pulse {
+  position: absolute;
+  top: 50%;
+  left: -0.75rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: var(--brand-glow);
+  box-shadow: 0 0 18px rgba(0, 212, 255, 0.9);
+  animation: stats-flow 3.8s linear infinite;
+}
+
+.stats-rail-pulse-b { animation-delay: -1.9s; }
+
+@media (min-width: 640px) {
+  .stats-cell + .stats-cell { border-top: 0; border-left: 1px solid var(--border); }
+}
 
 .eyebrow {
   display: inline-flex;

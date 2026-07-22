@@ -2,6 +2,7 @@ import Link from "next/link";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import HeroBillingCard from "@/app/components/HeroBillingCard";
+import LivePlatformStats from "@/app/components/LivePlatformStats";
 
 const layers = [
   {
@@ -88,6 +89,12 @@ export default function HomePage() {
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{layer.desc}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-5 py-12 sm:px-6 lg:py-20" aria-labelledby="network-stats-heading">
+          <div className="stats-ledger overflow-hidden rounded-[2rem] border border-[var(--border)]">
+            <LivePlatformStats />
           </div>
         </section>
 

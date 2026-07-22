@@ -5,7 +5,7 @@
  * Keeps helpers small and explicit instead of mirroring SQL ORM APIs.
  */
 
-import { MongoClient, type Collection, type Db, type Document } from "mongodb";
+import { Decimal128, MongoClient, type Collection, type Db, type Document } from "mongodb";
 import {
   type ApiKeyRecord,
   type DeveloperRecord,
@@ -15,6 +15,22 @@ import {
   type WebhookDeliveryRecord,
   type WebhookEndpointRecord,
 } from "./schema.js";
+
+interface PlatformPaymentEventDocument extends Document {
+  _id: string;
+  contractId: string;
+  eventType: string;
+  amountStroops: Decimal128;
+  ledger: number;
+  txHash: string;
+  ledgerClosedAt: Date;
+}
+
+interface PlatformStatsSyncDocument extends Document {
+  _id: "usdc-flow";
+  lastProcessedLedger: number;
+  updatedAt: Date;
+}
 
 function getMongoUri(): string {
   const uri = process.env.MONGODB_URI
@@ -84,6 +100,10 @@ async function ensureIndexes(db: Db): Promise<void> {
       { key: { developerId: 1 }, name: "tx_log_developer_idx" },
       { key: { method: 1 }, name: "tx_log_method_idx" },
     ]),
+    db.collection<PlatformPaymentEventDocument>("platform_payment_events").createIndexes([
+      { key: { ledger: 1 }, name: "platform_payment_event_ledger_idx" },
+      { key: { eventType: 1 }, name: "platform_payment_event_type_idx" },
+    ]),
   ]);
 
   // Older builds stored fieldless Soroban enums as `["Active"]`. Repair them
@@ -143,6 +163,74 @@ export async function updateDeveloper(id: string, patch: Partial<Omit<DeveloperR
     { _id: id },
     { $set: patch },
   );
+}
+
+export async function countDevelopers(): Promise<number> {
+  return (await col<DeveloperRecord>("developers")).countDocuments();
+}
+
+// ─── Public platform stats ──────────────────────────────────────────────────
+
+export interface PlatformPaymentEventInput {
+  id: string;
+  contractId: string;
+  eventType: string;
+  amountStroops: bigint;
+  ledger: number;
+  txHash: string;
+  ledgerClosedAt: Date;
+}
+
+export async function getPlatformStatsLastProcessedLedger(): Promise<number | null> {
+  const row = await (await col<PlatformStatsSyncDocument>("platform_stats_sync"))
+    .findOne({ _id: "usdc-flow" });
+  return row?.lastProcessedLedger ?? null;
+}
+
+export async function recordPlatformPaymentEvents(
+  events: PlatformPaymentEventInput[],
+  processedThroughLedger: number,
+): Promise<void> {
+  if (events.length > 0) {
+    await (await col<PlatformPaymentEventDocument>("platform_payment_events")).bulkWrite(
+      events.map((event) => ({
+        updateOne: {
+          filter: { _id: event.id },
+          update: {
+            $setOnInsert: {
+              contractId: event.contractId,
+              eventType: event.eventType,
+              amountStroops: Decimal128.fromString(event.amountStroops.toString()),
+              ledger: event.ledger,
+              txHash: event.txHash,
+              ledgerClosedAt: event.ledgerClosedAt,
+            },
+          },
+          upsert: true,
+        },
+      })),
+      { ordered: false },
+    );
+  }
+
+  await (await col<PlatformStatsSyncDocument>("platform_stats_sync")).updateOne(
+    { _id: "usdc-flow" },
+    {
+      $max: { lastProcessedLedger: processedThroughLedger },
+      $set: { updatedAt: new Date() },
+    },
+    { upsert: true },
+  );
+}
+
+export async function getTotalPlatformUsdcFlowStroops(): Promise<bigint> {
+  const rows = await (await col<PlatformPaymentEventDocument>("platform_payment_events"))
+    .aggregate<{ total: Decimal128 }>([
+      { $group: { _id: null, total: { $sum: "$amountStroops" } } },
+    ])
+    .toArray();
+
+  return BigInt(rows[0]?.total.toString() ?? "0");
 }
 
 // ─── API Keys ────────────────────────────────────────────────────────────────

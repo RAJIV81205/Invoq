@@ -16,6 +16,7 @@ import webhooksRouter      from "./routes/webhooks.js";
 import keysRouter          from "./routes/keys.js";
 import developersRouter    from "./routes/developers.js";
 import spendPoliciesRouter from "./routes/spend-policies.js";
+import statsRouter         from "./routes/stats.js";
 
 const log = createLogger("app");
 
@@ -102,6 +103,7 @@ export function createApp() {
   });
 
   // ── Routes ─────────────────────────────────────────────────────────────────
+  app.use("/v1/stats",         statsRouter);
   app.use("/v1/plans",         plansRouter);
   app.use("/v1/subscriptions", subscriptionsRouter);
   app.use("/v1/entitlement",   entitlementRouter);

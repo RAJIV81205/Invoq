@@ -13,11 +13,12 @@ async function handle(req: NextRequest, params: Promise<{ path: string[] }>) {
   const upstreamPath = subPath === "health" ? "/health" : `/v1/${subPath}`;
   const url = `${API_BASE_URL}${upstreamPath}${req.nextUrl.search}`;
 
-  // Auth gate: /v1/developers/signup, /login, and /health are open; everything
+  // Auth gate: signup, login, health, and aggregate platform stats are public; everything
   // else needs the invoq_session cookie.
   const isPublic =
     subPath === "developers/signup" ||
     subPath === "developers/login"  ||
+    subPath === "stats"             ||
     subPath === "health";
 
   const store = await cookies();
