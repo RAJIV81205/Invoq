@@ -18,12 +18,29 @@ Invoq gives developers one stack for recurring Stellar USDC payments, subscripti
 |---|---|
 | Live application | [invoq.rajivdubey.dev](https://invoq.rajivdubey.dev) |
 | Product walkthrough | [Watch on Google Drive](https://drive.google.com/file/d/1DbE18YM2nTtJ-pW2BgrkW0e25yTwzFUV/view?usp=sharing) |
+| Public Google Form | [https://forms.gle/ojmXyemZ6SSURXyi7](https://forms.gle/ojmXyemZ6SSURXyi7) |
+| Public response spreadsheet | [Google Sheets export](https://docs.google.com/spreadsheets/d/1mfVbig09d4KFmtZxoRmtr2Rdfod9WQjrGnWHNDWMVfA/edit?usp=sharing) |
 | Source repository | [github.com/RAJIV81205/Invoq](https://github.com/RAJIV81205/Invoq) |
 | Practical setup guide | [HOW_TO_USE.md](./HOW_TO_USE.md) |
 | Project documentation | [Invoq_Project_Documentation.md](./Invoq_Project_Documentation.md) |
 | Contract specification | [Invoq_Contract_Specification.md](./Invoq_Contract_Specification.md) |
 | SDK reference | [packages/invoq-sdk/README.md](./packages/invoq-sdk/README.md) |
 | Dashboard reference | [app/dashboard/README.md](./app/dashboard/README.md) |
+
+## Repository files
+
+The following files are present in this repository and are intentionally linked here for quick navigation:
+
+- `README.md` - this main project overview.
+- `HOW_TO_USE.md` - practical setup and usage guide.
+- `Invoq_Project_Documentation.md` - project proposal and architecture write-up.
+- `Invoq_Contract_Specification.md` - detailed Soroban contract specification.
+- `packages/invoq-sdk/README.md` - SDK reference and usage notes.
+- `app/dashboard/README.md` - dashboard architecture and route reference.
+- `invoq-api/FIRST_TIME_SETUP.md` - backend first-time setup instructions.
+- `Dockerfile` - production container definition for deployment/CD demos.
+- `.github/workflows/ci.yml` - CI workflow for checks and build validation.
+- `compose.yml` - local MongoDB and Redis support services.
 
 ## Demo video
 

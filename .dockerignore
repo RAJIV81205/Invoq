@@ -1,0 +1,11 @@
+.git
+.github
+.next
+.DS_Store
+node_modules
+target
+invoq-api/node_modules
+packages/**/node_modules
+**/*.log
+.env
+.env.*
