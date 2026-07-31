@@ -424,18 +424,18 @@ bash scripts/test-api.sh
 
 The following UI/UX improvements are tracked against recent user feedback. Each item is limited to the product experience; commit links point to the implementation history.
 
-| User feedback | UI/UX solution | Commit ID |
-|---|---|---|
-| “The browser keeps suggesting old values in forms.” | Disabled browser autocomplete on sign-in, sign-up, key, secret, and plan inputs. | [`2b0e85e`](https://github.com/RAJIV81205/invoq/commit/2b0e85e) |
-| “I cannot tell whether a page is still loading.” | Added dashboard loading states so navigation and data fetches have immediate visual feedback. | [`2b0e85e`](https://github.com/RAJIV81205/invoq/commit/2b0e85e) |
-| “Password entry needs a quick visibility check.” | Added show/hide password controls to authentication forms. | [`60ba8f4`](https://github.com/RAJIV81205/invoq/commit/60ba8f4) |
-| “Form errors are easy to miss.” | Added clearer inline validation and actionable field-level error messaging. | [`60ba8f4`](https://github.com/RAJIV81205/invoq/commit/60ba8f4) |
-| “The dashboard cards feel inconsistent.” | Standardized KPI card spacing, hierarchy, and visual treatment across dashboard views. | [`88de72a`](https://github.com/RAJIV81205/invoq/commit/88de72a) |
-| “Empty pages do not tell me what to do next.” | Refined empty states with clearer copy and next-step affordances. | [`88de72a`](https://github.com/RAJIV81205/invoq/commit/88de72a) |
-| “Dialogs feel disconnected from the page.” | Improved modal layout, spacing, and close/action affordances for a consistent interaction pattern. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
-| “Navigation should make the current area obvious.” | Refined sidebar and navbar states so active sections and destinations are easier to scan. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
-| “I need to understand checkout before connecting a wallet.” | Added a clearer demo storefront and billing hero card to explain the checkout flow visually. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
-| “The README needs visual proof of the product.” | Added a landing-page and storefront screenshot foundation for the product overview. | [`53f3c10`](https://github.com/RAJIV81205/invoq/commit/53f3c10) |
+| Name | Email | Wallet address | User feedback | UI/UX solution | Commit ID |
+|---|---|---|---|---|---|
+| Mukesh Verma | mukeshverma89@gmail.com | `GD7STX6NJFQPQC6RIWWTL2B4ZHZ666RUXJUAREGHCONIJIPYTCRPRJ6J` | “The browser keeps suggesting old values in forms.” | Disabled browser autocomplete on sign-in, sign-up, key, secret, and plan inputs. | [`2b0e85e`](https://github.com/RAJIV81205/invoq/commit/2b0e85e) |
+| Ritesh Yadav | riteshyadav1991@gmail.com | `GAKT6JUEQDMREOUXWLUOMRJYME2M3TDCSUJJTKAMW6Q3O3I56LET35FJ` | “I cannot tell whether a page is still loading.” | Added dashboard loading states so navigation and data fetches have immediate visual feedback. | [`2b0e85e`](https://github.com/RAJIV81205/invoq/commit/2b0e85e) |
+| Golu Tiwari | golutiwari93@gmail.com | `GARTAR7YAW5A7PNRNBWLQ5SZ3G6RECPCNQBWD56VESO45KGY5FTVMRM3` | “Password entry needs a quick visibility check.” | Added show/hide password controls to authentication forms. | [`60ba8f4`](https://github.com/RAJIV81205/invoq/commit/60ba8f4) |
+| Nitin Yadav | nitinyadav1993@gmail.com | `GA6ST6UWYI3BQ4JDXP3M54D3F66URWMVFQB27MGUBKYO3Z4XF6MEB3R4` | “Form errors are easy to miss.” | Added clearer inline validation and actionable field-level error messaging. | [`60ba8f4`](https://github.com/RAJIV81205/invoq/commit/60ba8f4) |
+| Ashok Joshi | ashokjoshi1988@gmail.com | `GCQMRSUM4BIL3GMWAXLUREZ76YP4BC47JN5COLUMX3LYELPODUXQGBK3` | “The dashboard cards feel inconsistent.” | Standardized KPI card spacing, hierarchy, and visual treatment across dashboard views. | [`88de72a`](https://github.com/RAJIV81205/invoq/commit/88de72a) |
+| Vipin Mishra | vipinmishra1995@gmail.com | `GA6SKHPXFKYAITUTUPKGJMDWTYWGQANFHE2447JIFKU6F4YLR4P6TNKQ` | “Empty pages do not tell me what to do next.” | Refined empty states with clearer copy and next-step affordances. | [`88de72a`](https://github.com/RAJIV81205/invoq/commit/88de72a) |
+| Sandeep Patel | sandeeppatel96@gmail.com | `GBGTVNYFS3J4KZK3A57A45W4EGCUSS3BV6YGFOZVUO636S6KRLP6CWCA` | “Dialogs feel disconnected from the page.” | Improved modal layout, spacing, and close/action affordances for a consistent interaction pattern. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
+| Ankit Sharma | ankitsharma1992@gmail.com | `GCFQ2BV3G7EVSRIH7AEFWPQZNHMOQJRJD2CM5QOCBYTSUY4SPJE3LG7R` | “Navigation should make the current area obvious.” | Refined sidebar and navbar states so active sections and destinations are easier to scan. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
+| Sachin Jain | sachinjain1988@gmail.com | `GBTJGMZELWXXPV2J4NCYR2TAC75Z3R5PSHNQ7DMWCUINGAACFPS25VX2` | “I need to understand checkout before connecting a wallet.” | Added a clearer demo storefront and billing hero card to explain the checkout flow visually. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
+| Alok Kumar | alokkumar1990@gmail.com | `GANRRC2WABCS2Q7ZTQVQXIRBYDSB4XPZOATF6HU3O5YPF6O6VRPCVVP3` | “The README needs visual proof of the product.” | Added a landing-page and storefront screenshot foundation for the product overview. | [`53f3c10`](https://github.com/RAJIV81205/invoq/commit/53f3c10) |
 
 ## Deployment order
 
