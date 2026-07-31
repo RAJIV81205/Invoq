@@ -420,6 +420,30 @@ CUSTOMER_ADDRESS=G... \
 bash scripts/test-api.sh
 ```
 
+## Users onboarded
+
+The following users have been onboarded to Invoq. Feedback summaries are included only where feedback has been provided.
+
+| Name | Email | Wallet address | Feedback summary |
+|---|---|---|---|
+| Mukesh Verma | mukeshverma89@gmail.com | `GD7STX6NJFQPQC6RIWWTL2B4ZHZ666RUXJUAREGHCONIJIPYTCRPRJ6J` | The browser keeps suggesting old values in forms. |
+| Rajiv Dubey | lucky81205@gmail.com | `GCGEXUG76FMVLCQHMVEUIQ2GPDEZSSNXQZQITISFUR433LZCD4UPGMYT` |  |
+| Ritesh Yadav | riteshyadav1991@gmail.com | `GAKT6JUEQDMREOUXWLUOMRJYME2M3TDCSUJJTKAMW6Q3O3I56LET35FJ` | I cannot tell whether a page is still loading. |
+| Awanind Kumar | awanind5924@gmail.com | `GCHGRZTUHBC57G3HL4L4DWMIKKHK3U5OR7KA7MV6U73ZZAUUIWNDN72E` |  |
+| Golu Tiwari | golutiwari93@gmail.com | `GARTAR7YAW5A7PNRNBWLQ5SZ3G6RECPCNQBWD56VESO45KGY5FTVMRM3` | Password entry needs a quick visibility check. |
+| Arjun Maurya | arjmaurya89@gmail.com | `GD2J3DJRB75JET64EAQHI4OBU5WL2RI4J5WGB7KVOXI6JAHQ3HXGM4KA` |  |
+| Nitin Yadav | nitinyadav1993@gmail.com | `GA6ST6UWYI3BQ4JDXP3M54D3F66URWMVFQB27MGUBKYO3Z4XF6MEB3R4` | Form errors are easy to miss. |
+| Raunak Dey | deyraunak000@gmail.com | `GARV5XOQ26XGSGIBT2IQRFAUELFGE2CGOQFRMRZK7TC5E2JZW74UVDZZ` |  |
+| Ashok Joshi | ashokjoshi1988@gmail.com | `GCQMRSUM4BIL3GMWAXLUREZ76YP4BC47JN5COLUMX3LYELPODUXQGBK3` | The dashboard cards feel inconsistent. |
+| Rahul Mandal | isc96912@gmail.com | `GDCD26UDJXO3YJE7OUEM5OZJR4JMNHFATWQ2IPAHI3WIZFMDG7B5EWIO` |  |
+| Vipin Mishra | vipinmishra1995@gmail.com | `GA6SKHPXFKYAITUTUPKGJMDWTYWGQANFHE2447JIFKU6F4YLR4P6TNKQ` | Empty pages do not tell me what to do next. |
+| Mayank Agarwal | mayankagar.8877@gmail.com | `GDAKNPJ2CMKT6DUNIKYNVNVZM4UPS5ZKKEYTYHKF43MKIJKKEFHBUFEJ` |  |
+| Sandeep Patel | sandeeppatel96@gmail.com | `GBGTVNYFS3J4KZK3A57A45W4EGCUSS3BV6YGFOZVUO636S6KRLP6CWCA` | Dialogs feel disconnected from the page. |
+| Mritunjay Kumar | mystic8340@gmail.com | `GBJEWZWOAYNQRPQSKXN2MWSW7WVEDUPPF76GDKXALX6BFMQ6DMA34ZB6` |  |
+| Ankit Sharma | ankitsharma1992@gmail.com | `GCFQ2BV3G7EVSRIH7AEFWPQZNHMOQJRJD2CM5QOCBYTSUY4SPJE3LG7R` | Navigation should make the current area obvious. |
+| Sachin Jain | sachinjain1988@gmail.com | `GBTJGMZELWXXPV2J4NCYR2TAC75Z3R5PSHNQ7DMWCUINGAACFPS25VX2` | I need to understand checkout before connecting a wallet. |
+| Alok Kumar | alokkumar1990@gmail.com | `GANRRC2WABCS2Q7ZTQVQXIRBYDSB4XPZOATF6HU3O5YPF6O6VRPCVVP3` | The README needs visual proof of the product. |
+
 ## User feedback
 
 The following UI/UX improvements are tracked against recent user feedback. Each item is limited to the product experience; commit links point to the implementation history.
