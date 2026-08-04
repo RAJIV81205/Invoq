@@ -18,8 +18,8 @@ Invoq gives developers one stack for recurring Stellar USDC payments, subscripti
 |---|---|
 | Live application | [invoq.rajivdubey.dev](https://invoq.rajivdubey.dev) |
 | Product walkthrough | [Watch on Google Drive](https://drive.google.com/file/d/1DbE18YM2nTtJ-pW2BgrkW0e25yTwzFUV/view?usp=sharing) |
-| Public Google Form | [https://forms.gle/ojmXyemZ6SSURXyi7](https://forms.gle/ojmXyemZ6SSURXyi7) |
-| Public response spreadsheet | [Google Sheets export](https://docs.google.com/spreadsheets/d/1mfVbig09d4KFmtZxoRmtr2Rdfod9WQjrGnWHNDWMVfA/edit?usp=sharing) |
+| Public Google Form | [https://forms.gle/EsKeNmXVTgGmyrT7A](https://forms.gle/EsKeNmXVTgGmyrT7A) |
+| Public response spreadsheet | [Google Sheets export](https://docs.google.com/spreadsheets/d/1OIW30zV1ibOP594Ko6Mfr-zoEjeFOWWaQ8K4W9STDK0/edit?usp=sharing) |
 | Source repository | [github.com/RAJIV81205/Invoq](https://github.com/RAJIV81205/Invoq) |
 | Practical setup guide | [HOW_TO_USE.md](./HOW_TO_USE.md) |
 | Project documentation | [Invoq_Project_Documentation.md](./Invoq_Project_Documentation.md) |
