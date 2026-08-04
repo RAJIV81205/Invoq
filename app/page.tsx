@@ -41,126 +41,195 @@ const useCases = [
   },
 ];
 
+function BoltIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z" />
+    </svg>
+  );
+}
+
+function OrbitIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <circle cx="12" cy="12" r="2.4" />
+      <ellipse cx="12" cy="12" rx="10" ry="4.3" transform="rotate(35 12 12)" />
+      <ellipse cx="12" cy="12" rx="10" ry="4.3" transform="rotate(-35 12 12)" />
+    </svg>
+  );
+}
+
+function LoopIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17.5 6.5A7.8 7.8 0 0 0 4.7 9L3 11m0 0 1.2-4M3 11l4-1.2M6.5 17.5A7.8 7.8 0 0 0 19.3 15l1.7-2m0 0-1.2 4M21 13l-4 1.2" />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+      <circle cx="12" cy="12" r="9.25" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="m10 8 4 4-4 4" />
+    </svg>
+  );
+}
+
+function StellarGlyph() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2.4">
+      <circle cx="16" cy="16" r="8.7" />
+      <path strokeLinecap="round" d="M5 20.2 27 10.9M5.2 15.9l21.6-9.1M8.4 25.5l15.2-6.4" />
+    </svg>
+  );
+}
+
+function CoinField() {
+  return (
+    <div className="invoq-coin-field" aria-hidden="true">
+      <span className="invoq-coin invoq-coin-a"><StellarGlyph /></span>
+      <span className="invoq-coin invoq-coin-b"><b>$</b></span>
+      <span className="invoq-coin invoq-coin-c"><StellarGlyph /></span>
+      <span className="invoq-coin invoq-coin-d"><b>USDC</b></span>
+      <span className="invoq-coin invoq-coin-e"><StellarGlyph /></span>
+      <span className="invoq-coin invoq-coin-f"><b>$</b></span>
+      <span className="invoq-orbit invoq-orbit-a" />
+      <span className="invoq-orbit invoq-orbit-b" />
+    </div>
+  );
+}
+
 export default function HomePage() {
   return (
-    <>
-      <Navbar />
-      <main className="overflow-hidden">
-        <section className="relative flex min-h-[100svh] overflow-hidden bg-[#0A0B0F] px-5 pb-8 pt-28 sm:px-6 sm:pt-32">
-          <div className="hero-orb hero-orb-a" />
-          <div className="hero-orb hero-orb-b" />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_65%,#0A0B0F_100%)]" />
+    <main className="invoq-landing">
+      <div className="invoq-hero-shell">
+        <div className="invoq-sky" aria-hidden="true">
+          <div className="invoq-aurora invoq-aurora-one" />
+          <div className="invoq-aurora invoq-aurora-two" />
+          <div className="invoq-grid-plane" />
+          <div className="invoq-grain" />
+        </div>
+        <CoinField />
+        <Navbar />
 
-          <div className="relative mx-auto flex w-full max-w-[720px] flex-col items-center justify-center text-center">
-            <div className="hero-reveal inline-flex items-center gap-2 rounded-full border border-[rgba(108,92,231,0.24)] bg-[rgba(19,21,28,0.68)] px-3 py-1.5 font-data text-[0.66rem] text-[var(--muted)] shadow-[0_0_24px_rgba(108,92,231,0.08)] backdrop-blur-md">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-glow)] shadow-[0_0_9px_var(--brand-glow)]" />
-              Built on x402 · Soroban · Stellar USDC
+        <section className="invoq-hero" aria-labelledby="hero-title">
+          <div className="invoq-hero-inner">
+            <div className="invoq-hero-badge invoq-fade-up">
+              <span /> Built on x402 · Soroban · Stellar USDC
             </div>
-
-            <h1 className="hero-reveal mt-5 max-w-[720px] text-[2.8rem] font-semibold leading-[0.98] tracking-[-0.045em] text-[var(--foreground)] sm:text-6xl lg:text-[4.5rem]" style={{ animationDelay: "70ms" }}>
-              Infrastructure for <span className="gradient-text">programmable subscription billing.</span>
+            <h1 id="hero-title" className="invoq-hero-title invoq-fade-up" style={{ "--delay": "70ms" } as React.CSSProperties}>
+              <span>
+                Billing <span className="invoq-inline-icon"><BoltIcon /></span> built for products
+              </span>
+              <span>
+                that move onchain <span className="invoq-inline-icon"><OrbitIcon /></span>
+              </span>
             </h1>
 
-            <p className="hero-reveal mt-5 max-w-[60ch] text-base leading-7 text-[var(--muted)] sm:text-lg sm:leading-8" style={{ animationDelay: "140ms" }}>
-              Launch recurring and usage-based payments on Stellar with one API and settlement your customers can verify.
+            <p className="invoq-hero-copy invoq-fade-up" style={{ "--delay": "150ms" } as React.CSSProperties}>
+              Launch recurring and usage-based payments on Stellar with one API and settlement your
+              customers can verify.
             </p>
 
-            <div className="hero-reveal mt-7 flex flex-col gap-3 sm:flex-row sm:gap-4" style={{ animationDelay: "210ms" }}>
-              <Link href="/signup" className="button-primary min-h-11 min-w-36 rounded-[10px] px-5">Start building</Link>
-              <Link href="/dashboard" className="button-secondary min-h-11 min-w-36 rounded-[10px] px-5">Explore dashboard</Link>
+            <div className="invoq-hero-actions invoq-fade-up" style={{ "--delay": "230ms" } as React.CSSProperties}>
+              <Link href="/signup" className="invoq-hero-cta">
+                <span>Start building</span>
+                <ArrowIcon />
+              </Link>
+              <Link href="/dashboard" className="invoq-hero-secondary">Explore dashboard</Link>
             </div>
 
-            <div className="mt-8 w-full sm:mt-10">
+            <div className="invoq-hero-card-wrap">
               <HeroBillingCard />
             </div>
 
-            <div className="hero-reveal mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 font-data text-[0.62rem] uppercase tracking-[0.14em] text-[var(--muted-deep)]" style={{ animationDelay: "350ms" }}>
-              <span>Powering AI billing on Stellar</span><span className="hidden h-px w-6 bg-[var(--border)] sm:block" /><span>5-second finality</span><span className="hidden h-px w-6 bg-[var(--border)] sm:block" /><span>USDC native</span>
+            <div className="invoq-proof invoq-fade-up" style={{ "--delay": "430ms" } as React.CSSProperties}>
+              <span className="invoq-proof-icon"><LoopIcon /></span>
+              <span>Powering AI billing on Stellar</span>
+              <i />
+              <span>5-second finality</span>
+              <i />
+              <span>USDC native</span>
             </div>
           </div>
         </section>
+      </div>
 
-        <section className="mx-auto max-w-7xl px-5 py-14 sm:px-6 lg:py-20">
-          <div className="grid gap-4 md:grid-cols-4">
-            {layers.map((layer, idx) => (
-              <div key={layer.title} className="surface rounded-[1.5rem] p-5">
-                <div className="text-xs font-mono text-[var(--brand-glow)]">0{idx + 1}</div>
-                <h2 className="mt-3 text-lg font-semibold tracking-[-0.03em]">{layer.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{layer.desc}</p>
-              </div>
+      <div className="invoq-page-body">
+        <section className="invoq-section invoq-stack-section" aria-labelledby="stack-heading">
+          <div className="invoq-section-heading">
+            <div className="invoq-kicker">The stack</div>
+            <h2 id="stack-heading">Everything billing needs.<br />Nothing it doesn&apos;t.</h2>
+          </div>
+          <div className="invoq-layer-grid">
+            {layers.map((layer, index) => (
+              <article key={layer.title} className="invoq-feature-card">
+                <div className="invoq-feature-number">0{index + 1}</div>
+                <h3>{layer.title}</h3>
+                <p>{layer.desc}</p>
+                <span className="invoq-feature-arrow" aria-hidden="true">↗</span>
+              </article>
             ))}
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-5 py-12 sm:px-6 lg:py-20" aria-labelledby="network-stats-heading">
-          <div className="stats-ledger overflow-hidden rounded-[2rem] border border-[var(--border)]">
+        <section className="invoq-section" aria-labelledby="network-stats-heading">
+          <div className="invoq-stats-shell">
             <LivePlatformStats />
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-5 py-12 sm:px-6 lg:py-20">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="eyebrow">Use cases</div>
-            <h2 className="mt-4 text-4xl font-semibold tracking-[-0.06em] sm:text-5xl">
-              One stack for every billing shape
-            </h2>
-            <p className="mt-4 text-base leading-7 text-[var(--muted)]">
-              Flat-rate plans, metered APIs, or vault-backed spend. The primitives stay simple.
-            </p>
+        <section id="pricing" className="invoq-section invoq-use-section" aria-labelledby="use-cases-heading">
+          <div className="invoq-section-heading invoq-section-heading-centered">
+            <div className="invoq-kicker">Use cases</div>
+            <h2 id="use-cases-heading">One stack for every billing shape</h2>
+            <p>Flat-rate plans, metered APIs, or vault-backed spend. The primitives stay simple.</p>
           </div>
-          <div className="mt-10 grid gap-5 md:grid-cols-3">
+          <div className="invoq-use-grid">
             {useCases.map((item) => (
-              <div key={item.title} className="surface rounded-[1.5rem] p-6">
-                <div className="text-xs uppercase tracking-[0.18em] text-[var(--brand-glow)]">{item.tag}</div>
-                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{item.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{item.desc}</p>
-              </div>
+              <article key={item.title} className="invoq-use-card">
+                <div className="invoq-use-tag">{item.tag}</div>
+                <h3>{item.title}</h3>
+                <p>{item.desc}</p>
+                <div className="invoq-use-rail"><span /></div>
+              </article>
             ))}
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-5 py-12 sm:px-6 lg:py-20">
-          <div className="surface-strong grid gap-8 rounded-[2rem] p-6 lg:grid-cols-[0.9fr_1.1fr] lg:p-8">
-            <div>
-              <div className="eyebrow">Developer first</div>
-              <h2 className="mt-4 text-4xl font-semibold tracking-[-0.06em] sm:text-5xl">
-                One function call per operation.
-              </h2>
-              <p className="mt-4 max-w-xl text-base leading-7 text-[var(--muted)]">
+        <section id="docs" className="invoq-section">
+          <div className="invoq-dev-panel">
+            <div className="invoq-dev-copy">
+              <div className="invoq-kicker">Developer first</div>
+              <h2>One function call per operation.</h2>
+              <p>
                 Invoq keeps the API surface thin. The product does the coordination so your app can
                 stay focused on shipping.
               </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link href="/test" className="button-secondary">
-                  Try the test suite
-                </Link>
-                <Link href="/signup" className="button-primary">
-                  Create account
-                </Link>
+              <div className="invoq-dev-actions">
+                <Link href="/test" className="invoq-hero-secondary">Try the test suite</Link>
+                <Link href="/signup" className="invoq-pill invoq-pill-primary">Create account</Link>
               </div>
             </div>
-
-            <div className="grid gap-4">
-              <div className="rounded-[1.25rem] border border-white/10 bg-[rgba(2,8,23,0.7)] p-5">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Server SDK</div>
-                <pre className="mt-4 overflow-x-auto text-xs leading-6 text-slate-200">
-                  <code>{`const invoq = new InvoqServer({ apiKey: process.env.INVOQ_KEY! });
+            <div className="invoq-code-stack">
+              <div className="invoq-code-card">
+                <div><span /> Server SDK</div>
+                <pre><code>{`const invoq = new InvoqServer({ apiKey: process.env.INVOQ_KEY! });
 await invoq.entitlement.check(customer, "api:pro");
-await invoq.usage.record(customer, tokensUsed);`}</code>
-                </pre>
+await invoq.usage.record(customer, tokensUsed);`}</code></pre>
               </div>
-              <div className="rounded-[1.25rem] border border-white/10 bg-[rgba(2,8,23,0.7)] p-5">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">Browser SDK</div>
-                <pre className="mt-4 overflow-x-auto text-xs leading-6 text-slate-200">
-                  <code>{`const invoq = new InvoqClient({ apiKey: import.meta.env.VITE_INVOQ_KEY });
-await invoq.checkout.subscribe(wallet, customer, planId);`}</code>
-                </pre>
+              <div className="invoq-code-card invoq-code-card-offset">
+                <div><span /> Browser SDK</div>
+                <pre><code>{`const invoq = new InvoqClient({ apiKey: import.meta.env.VITE_INVOQ_KEY });
+await invoq.checkout.subscribe(wallet, customer, planId);`}</code></pre>
               </div>
             </div>
           </div>
         </section>
-      </main>
+      </div>
+
       <Footer />
-    </>
+    </main>
   );
 }

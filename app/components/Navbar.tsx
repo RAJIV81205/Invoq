@@ -1,90 +1,134 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const links = [
-  { href: "/",          label: "Home" },
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/test",      label: "Test Suite" },
+  { href: "/dashboard", label: "Product" },
+  { href: "/demo-store", label: "Solutions" },
+  { href: "/test", label: "Developers" },
+  { href: "/#pricing", label: "Pricing" },
+  { href: "/#docs", label: "Docs" },
 ];
 
+function InvoqMark({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M5 4.5h9.5V14H5z" fill="currentColor" />
+      <path d="M17.5 4.5H27V14h-9.5z" fill="currentColor" opacity=".42" />
+      <path d="M5 17h9.5v9.5H5z" fill="currentColor" opacity=".42" />
+      <path d="m22.25 16.3 5.45 5.45-5.45 5.45-5.45-5.45z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path strokeLinecap="round" d="M5 5l14 14M19 5 5 19" />
+    </svg>
+  );
+}
+
 export default function Navbar() {
-  const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-40 w-full px-4 pt-4 sm:px-5 sm:pt-5">
-      <div className="mx-auto flex max-w-7xl items-center justify-between rounded-full border border-white/10 bg-[rgba(5,8,22,0.58)] px-4 py-3 shadow-2xl shadow-slate-950/20 backdrop-blur-2xl sm:px-5">
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-glow)] text-[0.7rem] font-black text-white shadow-lg shadow-violet-500/20 glow">
-            IQ
-          </div>
-          <span className="text-lg font-semibold tracking-[-0.03em]">Invoq</span>
+    <header className="invoq-nav">
+      <nav className="invoq-nav-inner" aria-label="Main navigation">
+        <Link href="/" className="invoq-wordmark" aria-label="Invoq home">
+          <InvoqMark className="invoq-mark" />
+          <span>invoq</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
-          {links.map((l) => {
-            const active = pathname === l.href || (l.href !== "/" && pathname.startsWith(l.href));
-            return (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                  active
-                    ? "bg-[rgba(255,255,255,0.08)] text-[var(--foreground)] shadow-sm"
-                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                }`}
-              >
-                {l.label}
-              </Link>
-            );
-          })}
+        <div className="invoq-nav-links">
+          {links.map((link) => (
+            <Link key={link.label} href={link.href}>
+              {link.label}
+            </Link>
+          ))}
         </div>
 
-        <div className="hidden md:flex items-center gap-2">
-          <Link
-            href="/login"
-            className="button-ghost px-4 py-2"
-          >
-            Log in
+        <div className="invoq-nav-actions">
+          <Link href="/signup" className="invoq-pill invoq-pill-primary">
+            Start building
           </Link>
-          <Link
-            href="/signup"
-            className="button-primary px-4 py-2 text-sm"
-          >
-            Sign up
+          <Link href="/login" className="invoq-pill invoq-pill-light">
+            Log in
           </Link>
         </div>
 
         <button
-          className="md:hidden p-2 text-[var(--muted)]"
-          onClick={() => setOpen(!open)}
-          aria-label="Toggle menu"
+          type="button"
+          className="invoq-menu-button"
+          aria-label="Open navigation menu"
+          aria-expanded={open}
+          onClick={() => setOpen(true)}
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
+          <span />
+          <span />
         </button>
-      </div>
+      </nav>
 
-      {open && (
-        <div className="md:hidden border-t border-white/10 px-6 py-4 flex flex-col gap-2 bg-[rgba(5,8,22,0.92)]">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              onClick={() => setOpen(false)}
-              className="rounded-xl px-3 py-2 text-sm font-medium text-[var(--muted)] hover:bg-white/5 hover:text-[var(--foreground)]"
-            >
-              {l.label}
+      <div className={`invoq-menu ${open ? "is-open" : ""}`} aria-hidden={!open}>
+        <button
+          className="invoq-menu-backdrop"
+          onClick={() => setOpen(false)}
+          aria-label="Close navigation menu"
+          tabIndex={open ? 0 : -1}
+        />
+        <aside className="invoq-menu-sheet" aria-label="Mobile navigation">
+          <div className="invoq-menu-header">
+            <Link href="/" className="invoq-wordmark" onClick={() => setOpen(false)}>
+              <InvoqMark className="invoq-mark" />
+              <span>invoq</span>
             </Link>
-          ))}
-          <Link href="/login" className="rounded-xl px-3 py-2 text-sm font-medium text-[var(--muted)]">Log in</Link>
-          <Link href="/signup" className="rounded-xl px-3 py-2 text-sm font-semibold text-[var(--foreground)]">Sign up</Link>
-        </div>
-      )}
-    </nav>
+            <button
+              type="button"
+              className="invoq-menu-close"
+              onClick={() => setOpen(false)}
+              aria-label="Close navigation menu"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+          <div className="invoq-menu-rule" />
+          <div className="invoq-menu-links">
+            {links.map((link, index) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                style={{ "--menu-index": index } as React.CSSProperties}
+                onClick={() => setOpen(false)}
+              >
+                {link.label}
+                <span aria-hidden="true">↗</span>
+              </Link>
+            ))}
+          </div>
+          <div className="invoq-menu-actions">
+            <Link href="/signup" className="invoq-pill invoq-pill-primary" onClick={() => setOpen(false)}>
+              Start building
+            </Link>
+            <Link href="/login" className="invoq-pill invoq-pill-light" onClick={() => setOpen(false)}>
+              Log in
+            </Link>
+          </div>
+        </aside>
+      </div>
+    </header>
   );
 }

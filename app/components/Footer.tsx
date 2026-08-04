@@ -1,40 +1,50 @@
 import Link from "next/link";
 
+function FooterMark() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 32 32" fill="none">
+      <path d="M5 4.5h9.5V14H5z" fill="currentColor" />
+      <path d="M17.5 4.5H27V14h-9.5z" fill="currentColor" opacity=".42" />
+      <path d="M5 17h9.5v9.5H5z" fill="currentColor" opacity=".42" />
+      <path d="m22.25 16.3 5.45 5.45-5.45 5.45-5.45-5.45z" fill="currentColor" />
+    </svg>
+  );
+}
+
 export default function Footer() {
   return (
-    <footer className="mt-24 border-t border-white/10 bg-[rgba(3,7,19,0.45)]">
-      <div className="mx-auto max-w-7xl px-6 py-12 grid gap-8 md:grid-cols-4">
-        <div className="md:col-span-2">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--brand-glow)] text-[0.68rem] font-black text-white shadow-lg shadow-violet-500/20">
-              IQ
-            </div>
-            <span className="font-semibold tracking-[-0.03em]">Invoq</span>
-          </div>
-          <p className="text-sm text-[var(--muted)] max-w-md leading-6">
-            Programmable subscription billing infrastructure for Stellar.
-            Built on x402, Soroban, and Stellar USDC.
+    <footer className="invoq-footer">
+      <div className="invoq-footer-main">
+        <div className="invoq-footer-brand">
+          <Link href="/" aria-label="Invoq home">
+            <FooterMark />
+            <span>invoq</span>
+          </Link>
+          <p>
+            Programmable subscription billing infrastructure for Stellar. Built on x402,
+            Soroban, and Stellar USDC.
           </p>
         </div>
-        <div>
-          <h3 className="font-semibold text-sm mb-3">Product</h3>
-          <ul className="space-y-2 text-sm text-[var(--muted)]">
+        <div className="invoq-footer-column">
+          <h3>Product</h3>
+          <ul>
             <li><Link href="/dashboard">Dashboard</Link></li>
             <li><Link href="/test">Test suite</Link></li>
             <li><Link href="/dashboard/plans">Plans</Link></li>
           </ul>
         </div>
-        <div>
-          <h3 className="font-semibold text-sm mb-3">Developers</h3>
-          <ul className="space-y-2 text-sm text-[var(--muted)]">
+        <div className="invoq-footer-column">
+          <h3>Developers</h3>
+          <ul>
             <li><Link href="/signup">Get an API key</Link></li>
             <li><a href="https://github.com/RAJIV81205/Invoq" target="_blank" rel="noreferrer">GitHub</a></li>
             <li><Link href="/test">API reference</Link></li>
           </ul>
         </div>
       </div>
-      <div className="border-t border-white/10 py-5 text-center text-xs text-[var(--muted)]">
-        © {new Date().getFullYear()} Invoq · Built on Stellar
+      <div className="invoq-footer-base">
+        <span>© {new Date().getFullYear()} Invoq</span>
+        <span>Built on Stellar</span>
       </div>
     </footer>
   );
