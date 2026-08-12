@@ -103,6 +103,9 @@
 .checkoutButton { width: 100%; min-height: 52px; margin-top: 20px; border: 0; border-radius: 3px; cursor: pointer; color: white; background: var(--coral); font-size: 14px; font-weight: 900; transition: transform 150ms ease, box-shadow 150ms ease; }
 .checkoutButton:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 0 rgba(20,32,30,.15); }
 .checkoutButton:disabled { cursor: not-allowed; opacity: .48; }
+.checkoutProgress { position: relative; height: 28px; margin-top: 12px; overflow: hidden; border-radius: 3px; background: rgba(20,32,30,.08); }
+.checkoutProgress div { height: 100%; background: rgba(157,226,194,.55); transition: width 250ms ease; }
+.checkoutProgress span { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink); font: 700 9px "Courier New", monospace; letter-spacing: .04em; }
 .success { margin-top: 20px; padding: 18px; display: flex; gap: 14px; align-items: center; color: #0f5e40; background: rgba(157,226,194,.35); }
 .successMark { width: 33px; height: 33px; display: grid; place-items: center; flex: none; border-radius: 50%; color: white; background: #1d9b64; font-weight: 900; }
 .success strong { display: block; }

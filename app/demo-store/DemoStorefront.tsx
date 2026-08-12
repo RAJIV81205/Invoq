@@ -239,6 +239,14 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
     submitting: "Recording subscription…",
     success: "Subscription active",
   };
+  const checkoutProgress: Partial<Record<CheckoutState, number>> = {
+    connecting: 15,
+    approving: 35,
+    building: 55,
+    signing: 75,
+    submitting: 90,
+    success: 100,
+  };
 
   return (
     <main className={styles.page}>
@@ -404,6 +412,13 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
             >
               {configured ? checkoutLabel[checkoutState] : "Complete developer setup"}
             </button>
+          )}
+
+          {checkoutState !== "idle" && checkoutState !== "success" && (
+            <div className={styles.checkoutProgress} role="progressbar" aria-label={checkoutLabel[checkoutState]} aria-valuenow={checkoutProgress[checkoutState]} aria-valuemin={0} aria-valuemax={100}>
+              <div style={{ width: `${checkoutProgress[checkoutState]}%` }} />
+              <span>{checkoutLabel[checkoutState]}</span>
+            </div>
           )}
 
           {error && <p className={styles.error} role="alert">{error}</p>}
