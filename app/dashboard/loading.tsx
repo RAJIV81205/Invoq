@@ -1,6 +1,10 @@
 export default function DashboardLoading() {
   return (
-    <div className="space-y-6" aria-label="Loading dashboard" aria-live="polite">
+    <div className="space-y-6" aria-busy="true" aria-label="Loading dashboard" aria-live="polite">
+      <div className="flex items-center gap-3 text-sm text-[var(--muted)]" role="status">
+        <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--brand-glow)]" />
+        Loading live plans, subscriptions, and billing events…
+      </div>
       <div className="surface overflow-hidden rounded-[1.25rem] p-6 sm:p-8">
         <div className="h-2 w-28 animate-pulse rounded-full bg-white/10" />
         <div className="mt-5 h-10 w-full max-w-md animate-pulse rounded-lg bg-white/[0.07]" />
@@ -12,6 +16,7 @@ export default function DashboardLoading() {
         ))}
       </div>
       <div className="surface h-72 animate-pulse rounded-[1.25rem] bg-white/[0.025]" />
+      <span className="sr-only">Dashboard data is still loading.</span>
     </div>
   );
 }
