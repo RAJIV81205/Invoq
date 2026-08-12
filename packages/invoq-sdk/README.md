@@ -10,6 +10,28 @@ npm install invoq-sdk
 pnpm add invoq-sdk
 ```
 
+## Five-minute integration
+
+1. Create a publishable key and plan in the Invoq dashboard.
+2. Install `invoq-sdk` in your storefront.
+3. Configure the client with the publishable key and API URL.
+4. Pass your wallet adapter, customer address, and plan ID to checkout.
+
+```typescript
+import InvoqClient from "invoq-sdk/client";
+
+const invoq = new InvoqClient({
+  apiKey: process.env.NEXT_PUBLIC_INVOQ_KEY!,
+  baseUrl: process.env.NEXT_PUBLIC_INVOQ_API_URL!,
+});
+
+await invoq.checkout.subscribe(wallet, customerAddress, planId);
+```
+
+The customer signs two Testnet transactions: a USDC allowance followed by
+subscription creation. Keep `sk_` keys on the server; browser code must use a
+`pk_` key. See [Client checkout](#client-checkout) for the full wallet adapter.
+
 ## Two imports, two use cases
 
 | Import | Key type | Environment | Use for |
