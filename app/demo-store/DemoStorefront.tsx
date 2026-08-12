@@ -380,6 +380,10 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
         </div>
 
         <div className={styles.checkoutCard}>
+          <div className={`${styles.integrationStatus} ${configured ? styles.statusReady : styles.statusNeedsSetup}`} role="status">
+            <span />
+            {configured ? `Plan #${config.planId} verified · ready for Testnet checkout` : "Setup required · add a publishable key and plan ID"}
+          </div>
           <div className={styles.priceRow}>
             <span className={styles.price}><sup>$</sup>{price}</span>
             <span>USDC<br />per {plan ? intervalLabel(plan.interval_seconds) : "month"}</span>
