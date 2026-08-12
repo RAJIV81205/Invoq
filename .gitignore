@@ -49,3 +49,7 @@ test_snapshots/
 # Local settings
 .soroban
 .stellar
+
+# Local resumable state for website transaction runner
+scripts/website-transactions.state.json
+scripts/run-website-transactions.ts
