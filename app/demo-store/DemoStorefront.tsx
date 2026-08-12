@@ -375,6 +375,14 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
             </div>
           )}
 
+          {checkoutState === "idle" && !txHash && (
+            <ol className={styles.checkoutSteps} aria-label="Checkout steps">
+              <li><span>1</span>Connect Freighter on Testnet</li>
+              <li><span>2</span>Approve USDC spending</li>
+              <li><span>3</span>Confirm subscription</li>
+            </ol>
+          )}
+
           {checkoutState === "success" ? (
             <div className={styles.success}>
               <span className={styles.successMark}>✓</span>
