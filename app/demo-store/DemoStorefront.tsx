@@ -78,6 +78,7 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
   const [existingSubscriptionStatus, setExistingSubscriptionStatus] = useState("");
   const [error, setError] = useState("");
   const [txHash, setTxHash] = useState("");
+  const [walletNotice, setWalletNotice] = useState("");
 
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -152,6 +153,7 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
       await connectFreighter();
       const address = await getFreighterAddress();
       setWalletAddress(address);
+      setWalletNotice(`Wallet ${shortAddress(address)} connected on Stellar Testnet.`);
       setCheckoutState("idle");
       return address;
     } catch (err) {
@@ -177,6 +179,7 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
         await connectFreighter();
         customer = await getFreighterAddress();
         setWalletAddress(customer);
+        setWalletNotice(`Wallet ${shortAddress(customer)} connected. Continue in Freighter to approve USDC.`);
       }
 
       const current = await apiRequest<{
@@ -382,6 +385,8 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
               <button type="button" onClick={connectWallet}>Change</button>
             </div>
           )}
+
+          {walletNotice && <p className={styles.walletNotice} role="status">{walletNotice}</p>}
 
           {checkoutState === "idle" && !txHash && (
             <ol className={styles.checkoutSteps} aria-label="Checkout steps">

@@ -97,6 +97,7 @@
 .trial { margin: 15px 0; padding: 9px 12px; color: #176b49; background: rgba(157,226,194,.35); font-size: 12px; font-weight: 700; }
 .walletRow { margin-top: 20px; display: flex; align-items: center; gap: 9px; font: 11px "Courier New", monospace; }
 .walletRow button { margin-left: auto; border: 0; cursor: pointer; color: inherit; background: transparent; text-decoration: underline; }
+.walletNotice { margin: 10px 0 0; padding: 9px 11px; border-left: 3px solid #1d9b64; color: #176b49; background: rgba(157,226,194,.2); font-size: 10px; line-height: 1.5; }
 .checkoutSteps { margin: 18px 0 0; padding: 0; display: grid; gap: 8px; list-style: none; color: #59635f; font-size: 11px; }
 .checkoutSteps li { display: flex; align-items: center; gap: 9px; }
 .checkoutSteps span { width: 20px; height: 20px; display: grid; place-items: center; flex: none; border: 1px solid rgba(20,32,30,.2); border-radius: 50%; color: var(--ink); font: 700 9px "Courier New", monospace; }
