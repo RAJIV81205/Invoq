@@ -40,6 +40,11 @@ export default async function PlansPage() {
         </div>
       </div>
 
+      <div className="surface-soft flex flex-col gap-3 rounded-xl px-4 py-3 text-xs text-[var(--muted)] sm:flex-row sm:items-center sm:justify-between">
+        <span><strong className="text-[var(--foreground)]">Next step:</strong> create a plan, then copy its ID and a publishable key into your checkout.</span>
+        <Link href="/demo-store" className="font-medium text-[var(--brand-glow)] hover:text-white">Open checkout demo →</Link>
+      </div>
+
       {plans.length === 0 ? (
         <EmptyState
           title="No plans yet"
