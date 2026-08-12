@@ -893,27 +893,23 @@ export async function wrapAndSubmit(
 // ─── Polling ──────────────────────────────────────────────────────────────────
 
 /**
- * Poll for transaction confirmation using exponential backoff with jitter.
+ * Poll for transaction confirmation using a short fixed interval with jitter.
  *
- * Backoff schedule (approximate):
- *   attempt 1:  1.0 s base + jitter
- *   attempt 2:  1.5 s base + jitter
- *   attempt 3:  2.25 s base + jitter
- *   ...capped at MAX_INTERVAL_MS
+ * Keep this below callers' 120-second HTTP timeout. A long exponential poll can
+ * outlive the request, leaving clients unable to distinguish failure from a
+ * transaction that was accepted and is still pending.
  */
 async function pollForConfirmation(
   hash: string,
-  maxAttempts   = 40,
-  baseIntervalMs = 1_000,
-  maxIntervalMs  = 10_000
+  maxAttempts = 45,
+  intervalMs = 1_000,
 ): Promise<{ txHash: string; error: string | null }> {
   const rpc = getRpc();
 
   for (let i = 0; i < maxAttempts; i++) {
-    // Exponential backoff: base × 1.5^i, capped, plus up to 200 ms jitter
-    const backoff = Math.min(baseIntervalMs * 1.5 ** i, maxIntervalMs);
+    // Poll near ledger cadence without extending past the HTTP deadline.
     const jitter  = Math.random() * 200;
-    await sleep(backoff + jitter);
+    await sleep(intervalMs + jitter);
 
     let result;
     try {
