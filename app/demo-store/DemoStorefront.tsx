@@ -8,6 +8,7 @@ import styles from "./demo-store.module.css";
 const NETWORK_PASSPHRASE = "Test SDF Network ; September 2015";
 const STROOPS_PER_USDC = 10_000_000;
 const STORAGE_KEY = "invoq-demo-store-config";
+const PLAN_CACHE_KEY = "invoq-demo-store-plan";
 
 type Plan = {
   plan_id: string;
@@ -85,12 +86,20 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
     if (!saved) return;
     try {
       const parsed = JSON.parse(saved) as Partial<DemoConfig>;
+      const cachedPlan = window.sessionStorage.getItem(PLAN_CACHE_KEY);
       const frame = window.requestAnimationFrame(() => {
         setConfig((current) => ({
           apiBaseUrl: parsed.apiBaseUrl || current.apiBaseUrl,
           publishableKey: parsed.publishableKey || "",
           planId: parsed.planId || "",
         }));
+        if (cachedPlan) {
+          const restored = JSON.parse(cachedPlan) as Plan;
+          if (restored.plan_id === parsed.planId && restored.active) {
+            setPlan(restored);
+            setSetupOpen(false);
+          }
+        }
       });
       return () => window.cancelAnimationFrame(frame);
     } catch {
@@ -137,6 +146,7 @@ export default function DemoStorefront({ defaultApiBaseUrl }: { defaultApiBaseUr
       if (!loadedPlan.active) throw new Error("This plan is inactive. Choose an active plan.");
       setPlan(loadedPlan);
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+      window.sessionStorage.setItem(PLAN_CACHE_KEY, JSON.stringify(loadedPlan));
       setSetupOpen(false);
     } catch (err) {
       setPlan(null);
