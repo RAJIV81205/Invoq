@@ -423,44 +423,37 @@ bash scripts/test-api.sh
 
 ## Users onboarded
 
-The following users have been onboarded to Invoq. Feedback summaries are included only where feedback has been provided.
+Ten feedback participants selected for this iteration. Expand a response to see every submitted field without making the table unnecessarily tall.
 
-| Name | Email | Wallet address | Feedback summary |
+| User | Wallet address | Response | Transaction |
 |---|---|---|---|
-| Mukesh Verma | mukeshverma89@gmail.com | `GD7STX6NJFQPQC6RIWWTL2B4ZHZ666RUXJUAREGHCONIJIPYTCRPRJ6J` | The browser keeps suggesting old values in forms. |
-| Rajiv Dubey | lucky81205@gmail.com | `GCGEXUG76FMVLCQHMVEUIQ2GPDEZSSNXQZQITISFUR433LZCD4UPGMYT` |  |
-| Ritesh Yadav | riteshyadav1991@gmail.com | `GAKT6JUEQDMREOUXWLUOMRJYME2M3TDCSUJJTKAMW6Q3O3I56LET35FJ` | I cannot tell whether a page is still loading. |
-| Awanind Kumar | awanind5924@gmail.com | `GCHGRZTUHBC57G3HL4L4DWMIKKHK3U5OR7KA7MV6U73ZZAUUIWNDN72E` |  |
-| Golu Tiwari | golutiwari93@gmail.com | `GARTAR7YAW5A7PNRNBWLQ5SZ3G6RECPCNQBWD56VESO45KGY5FTVMRM3` | Password entry needs a quick visibility check. |
-| Arjun Maurya | arjmaurya89@gmail.com | `GD2J3DJRB75JET64EAQHI4OBU5WL2RI4J5WGB7KVOXI6JAHQ3HXGM4KA` |  |
-| Nitin Yadav | nitinyadav1993@gmail.com | `GA6ST6UWYI3BQ4JDXP3M54D3F66URWMVFQB27MGUBKYO3Z4XF6MEB3R4` | Form errors are easy to miss. |
-| Raunak Dey | deyraunak000@gmail.com | `GARV5XOQ26XGSGIBT2IQRFAUELFGE2CGOQFRMRZK7TC5E2JZW74UVDZZ` |  |
-| Ashok Joshi | ashokjoshi1988@gmail.com | `GCQMRSUM4BIL3GMWAXLUREZ76YP4BC47JN5COLUMX3LYELPODUXQGBK3` | The dashboard cards feel inconsistent. |
-| Rahul Mandal | isc96912@gmail.com | `GDCD26UDJXO3YJE7OUEM5OZJR4JMNHFATWQ2IPAHI3WIZFMDG7B5EWIO` |  |
-| Vipin Mishra | vipinmishra1995@gmail.com | `GA6SKHPXFKYAITUTUPKGJMDWTYWGQANFHE2447JIFKU6F4YLR4P6TNKQ` | Empty pages do not tell me what to do next. |
-| Mayank Agarwal | mayankagar.8877@gmail.com | `GDAKNPJ2CMKT6DUNIKYNVNVZM4UPS5ZKKEYTYHKF43MKIJKKEFHBUFEJ` |  |
-| Sandeep Patel | sandeeppatel96@gmail.com | `GBGTVNYFS3J4KZK3A57A45W4EGCUSS3BV6YGFOZVUO636S6KRLP6CWCA` | Dialogs feel disconnected from the page. |
-| Mritunjay Kumar | mystic8340@gmail.com | `GBJEWZWOAYNQRPQSKXN2MWSW7WVEDUPPF76GDKXALX6BFMQ6DMA34ZB6` |  |
-| Ankit Sharma | ankitsharma1992@gmail.com | `GCFQ2BV3G7EVSRIH7AEFWPQZNHMOQJRJD2CM5QOCBYTSUY4SPJE3LG7R` | Navigation should make the current area obvious. |
-| Sachin Jain | sachinjain1988@gmail.com | `GBTJGMZELWXXPV2J4NCYR2TAC75Z3R5PSHNQ7DMWCUINGAACFPS25VX2` | I need to understand checkout before connecting a wallet. |
-| Alok Kumar | alokkumar1990@gmail.com | `GANRRC2WABCS2Q7ZTQVQXIRBYDSB4XPZOATF6HU3O5YPF6O6VRPCVVP3` | The README needs visual proof of the product. |
+| Dhiraj Chandel<br><sub>iamdhiraj.777@gmail.com</sub> | `GBTHMMFWTAPFAHRGS33LKETZYJKBTNEENRN47EDZMZPT2BNCJO47GVQG` | <details><summary>4/5 · Excellent UX · Yes</summary><sub>Submitted: 06/08/2026 12:32:14<br>Feedback: Make a proper guide and docs section about using the SDK.<br>Comment: —<br>Liked: —</sub></details> | — |
+| Indrajit Singh<br><sub>indrasharing0605@gmail.com</sub> | `GB4FRPZQ3AILWMBEOVQ6DDNMRDJVREPVDPZ2WMFDPTGODUXOFTUKS777` | <details><summary>4/5 · Average UX · Maybe</summary><sub>Submitted: 03/08/2026 11:51:36<br>Feedback: The UI looks AI-generated; improve it.<br>Comment: —<br>Liked: —</sub></details> | — |
+| Bunny Bad<br><sub>cbunny.bad@gmail.com</sub> | `GDEEU4HB6XPNOKJI4IDKLKH2J5UTDW2CAPIL5Y4RH6KPZLJRHKMQGAQP` | <details><summary>3/5 · Average UX · Maybe</summary><sub>Submitted: 11/08/2026 07:59:14<br>Feedback: Works fine, but the flow took a moment to understand.<br>Comment: Small hints around wallet steps could help.<br>Liked: Payment was easy after connecting.</sub></details> | [`5700cef…b13f9b`](https://stellar.expert/explorer/testnet/tx/5700cef2ab2ee59032802cdc6c37282a11bb5a5ea036ec402543a7bde0b13f9b) |
+| Harnoor Singh<br><sub>harnoorsingh.online@gmail.com</sub> | `GAVL2YMVAKNRVUN3QDHXZRKPHZ7WVDF3IJ56L3KCEX55RLENBFINBLZJ` | <details><summary>4/5 · Good UX · Yes</summary><sub>Submitted: 09/08/2026 17:41:24<br>Feedback: Payment confirmation could feel faster.<br>Comment: Show clearer transaction status updates.<br>Liked: Connecting wallet and choosing a plan.</sub></details> | [`af30199…009de`](https://stellar.expert/explorer/testnet/tx/af30199a7a5195d7d2ec426b45cfc721f7bebff00a14111648be8dee246009de) |
+| Sri Hasini Sripada<br><sub>srihasinisripada@gmail.com</sub> | `GBJX6LGODZ2ILYNYSNCLGYLONPWR7NXFZRHJXUBEW2W2ADPFM6ZAQQP3` | <details><summary>3/5 · Average UX · Maybe</summary><sub>Submitted: 09/08/2026 18:24:28<br>Feedback: Some interface areas need more polish.<br>Comment: Better feedback after wallet actions would help.<br>Liked: Straightforward payment flow.</sub></details> | [`e17235c…3a56`](https://stellar.expert/explorer/testnet/tx/e17235cdd36e4d3db1c27a81008711b5cc0df8f6caa09217c015441de67e3a56) |
+| Ritesh Ranjan<br><sub>riteshranjan1972@gmail.com</sub> | `GBN4EZSWW2672IJYN74WN6LIDCTPDIACCKRAWQ5JDIQ45FRFNRNCTZBF` | <details><summary>4/5 · Good UX · Yes</summary><sub>Submitted: 11/08/2026 08:34:21<br>Feedback: Completed everything without much effort.<br>Comment: Improve loading indicators.<br>Liked: Short subscription process.</sub></details> | [`5be0233…6975b`](https://stellar.expert/explorer/testnet/tx/5be023321950418b725086effc03b1e78ade03b3ecae8ed0cdde824cc6d6975b) |
+| Mohammad Faizan<br><sub>mohdfaizan8222@gmail.com</sub> | `GCYIZ3UPGAJZ636PBLVUMKBCQD4UPAYFS22AH5C47JE2TSCHB3ZG7USW` | <details><summary>3/5 · Average UX · Maybe</summary><sub>Submitted: 12/08/2026 08:49:18<br>Feedback: Flow feels slow in places.<br>Comment: —<br>Liked: Basic subscription process is simple.</sub></details> | [`74d579d…19674`](https://stellar.expert/explorer/testnet/tx/74d579dbac9e327dd898980e84a4008a14a6e28600600a90d0f0582124159674) |
+| Akshita Srivastava<br><sub>akshitasrivastava189@gmail.com</sub> | `GDTNOVG7ZXZBPPC4BTYRELUCMZ2PBM7U53DZUXCVDTUVULWARCEAYLUZ` | <details><summary>4/5 · Good UX · Yes</summary><sub>Submitted: 12/08/2026 08:59:48<br>Feedback: A few screens could be more intuitive.<br>Comment: —<br>Liked: Clean, uncluttered layout.</sub></details> | [`d22aac3…2ee1`](https://stellar.expert/explorer/testnet/tx/d22aac396957892687c11ad7353c43c0ac1eb813995c0403eb2ea2107cd72ee1) |
+| Vardhaann Rathore<br><sub>anaxx34@gmail.com</sub> | `GASLL57D3DOIJNSTZIB4UHGJQ3Z5WWDBRGBWQWG6SQRWZR7BTBXCSTJ5` | <details><summary>2/5 · Poor UX · Maybe</summary><sub>Submitted: 12/08/2026 10:02:39<br>Feedback: Usable, but the experience feels rough.<br>Comment: —<br>Liked: Plan information was easy to find.</sub></details> | [`2df1849…b46ab`](https://stellar.expert/explorer/testnet/tx/2df1849a43d5d4c49f99c96d4ac70ea57b4136e38f4d1b636cd629d63d6b46ab) |
+| Srinadh Ghantasala<br><sub>2403031460778@paruluniversity.ac.in</sub> | `GAXFKMGACPLODUYX6VCQKKHVQUBBHA5MNRZGXBMCLCJU2EXOU5C7HBBY` | <details><summary>3/5 · Average UX · Maybe</summary><sub>Submitted: 12/08/2026 11:48:09<br>Feedback: Some steps were not immediately clear.<br>Comment: Add a better status message.<br>Liked: App is fairly straightforward.</sub></details> | [`4d4594a…b21fc`](https://stellar.expert/explorer/testnet/tx/4d4594aa4c48e450740ae30da18eb964a51e9a3e05465379b91a05cc88cb21fc) |
 
 ## User feedback
 
-The following UI/UX improvements are tracked against recent user feedback. Each item is limited to the product experience; commit links point to the implementation history.
+Ten changes were implemented from the selected feedback. Every link opens the exact implementation commit.
 
-| Name | Email | Wallet address | User feedback | UI/UX solution | Commit ID |
-|---|---|---|---|---|---|
-| Mukesh Verma | mukeshverma89@gmail.com | `GD7STX6NJFQPQC6RIWWTL2B4ZHZ666RUXJUAREGHCONIJIPYTCRPRJ6J` | “The browser keeps suggesting old values in forms.” | Disabled browser autocomplete on sign-in, sign-up, key, secret, and plan inputs. | [`2b0e85e`](https://github.com/RAJIV81205/invoq/commit/2b0e85e) |
-| Ritesh Yadav | riteshyadav1991@gmail.com | `GAKT6JUEQDMREOUXWLUOMRJYME2M3TDCSUJJTKAMW6Q3O3I56LET35FJ` | “I cannot tell whether a page is still loading.” | Added dashboard loading states so navigation and data fetches have immediate visual feedback. | [`2b0e85e`](https://github.com/RAJIV81205/invoq/commit/2b0e85e) |
-| Golu Tiwari | golutiwari93@gmail.com | `GARTAR7YAW5A7PNRNBWLQ5SZ3G6RECPCNQBWD56VESO45KGY5FTVMRM3` | “Password entry needs a quick visibility check.” | Added show/hide password controls to authentication forms. | [`60ba8f4`](https://github.com/RAJIV81205/invoq/commit/60ba8f4) |
-| Nitin Yadav | nitinyadav1993@gmail.com | `GA6ST6UWYI3BQ4JDXP3M54D3F66URWMVFQB27MGUBKYO3Z4XF6MEB3R4` | “Form errors are easy to miss.” | Added clearer inline validation and actionable field-level error messaging. | [`60ba8f4`](https://github.com/RAJIV81205/invoq/commit/60ba8f4) |
-| Ashok Joshi | ashokjoshi1988@gmail.com | `GCQMRSUM4BIL3GMWAXLUREZ76YP4BC47JN5COLUMX3LYELPODUXQGBK3` | “The dashboard cards feel inconsistent.” | Standardized KPI card spacing, hierarchy, and visual treatment across dashboard views. | [`88de72a`](https://github.com/RAJIV81205/invoq/commit/88de72a) |
-| Vipin Mishra | vipinmishra1995@gmail.com | `GA6SKHPXFKYAITUTUPKGJMDWTYWGQANFHE2447JIFKU6F4YLR4P6TNKQ` | “Empty pages do not tell me what to do next.” | Refined empty states with clearer copy and next-step affordances. | [`88de72a`](https://github.com/RAJIV81205/invoq/commit/88de72a) |
-| Sandeep Patel | sandeeppatel96@gmail.com | `GBGTVNYFS3J4KZK3A57A45W4EGCUSS3BV6YGFOZVUO636S6KRLP6CWCA` | “Dialogs feel disconnected from the page.” | Improved modal layout, spacing, and close/action affordances for a consistent interaction pattern. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
-| Ankit Sharma | ankitsharma1992@gmail.com | `GCFQ2BV3G7EVSRIH7AEFWPQZNHMOQJRJD2CM5QOCBYTSUY4SPJE3LG7R` | “Navigation should make the current area obvious.” | Refined sidebar and navbar states so active sections and destinations are easier to scan. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
-| Sachin Jain | sachinjain1988@gmail.com | `GBTJGMZELWXXPV2J4NCYR2TAC75Z3R5PSHNQ7DMWCUINGAACFPS25VX2` | “I need to understand checkout before connecting a wallet.” | Added a clearer demo storefront and billing hero card to explain the checkout flow visually. | [`1477e72`](https://github.com/RAJIV81205/invoq/commit/1477e72) |
-| Alok Kumar | alokkumar1990@gmail.com | `GANRRC2WABCS2Q7ZTQVQXIRBYDSB4XPZOATF6HU3O5YPF6O6VRPCVVP3` | “The README needs visual proof of the product.” | Added a landing-page and storefront screenshot foundation for the product overview. | [`53f3c10`](https://github.com/RAJIV81205/invoq/commit/53f3c10) |
+| User | Feedback | Implemented change | Commit |
+|---|---|---|---|
+| Dhiraj Chandel | Add a proper SDK guide and docs section. | Added a five-minute client integration guide with key safety and checkout flow. | [`f1701e7`](https://github.com/RAJIV81205/invoq/commit/f1701e7f7ffe4d4ad80a8750103540748b9ce5ee) |
+| Indrajit Singh | UI looks AI-generated. | Replaced generic grid/gradient treatment with quieter product-specific texture and solid actions. | [`f000e7d`](https://github.com/RAJIV81205/invoq/commit/f000e7dfef30d9c13b6207a1a01f56a6ed531d3f) |
+| Bunny Bad | Add hints around wallet steps. | Added a three-step Freighter, USDC approval, and subscription guide before checkout. | [`62651ff`](https://github.com/RAJIV81205/invoq/commit/62651ffd4917027109a9e992699da419eec320de) |
+| Harnoor Singh | Show clearer transaction updates. | Added percentage progress with current wallet/transaction action. | [`19d5aea`](https://github.com/RAJIV81205/invoq/commit/19d5aeaabbe52f4d466c71f65d294c3047c97fab) |
+| Sri Hasini Sripada | Improve feedback after wallet actions. | Added live confirmation after wallet connection and before USDC approval. | [`7630b84`](https://github.com/RAJIV81205/invoq/commit/7630b84b2434b96bf2247fe81901c1932ce02306) |
+| Ritesh Ranjan | Improve loading indicators. | Added explicit live-data loading copy, progress signal, and accessibility state. | [`fad324a`](https://github.com/RAJIV81205/invoq/commit/fad324a7abbfa1435545e049cd1da80f8e6411af) |
+| Mohammad Faizan | Flow feels slow in places. | Restored the verified plan from session cache for faster repeat checkout visits. | [`eaa15c9`](https://github.com/RAJIV81205/invoq/commit/eaa15c97e38af604176bf15aea2e59005649c346) |
+| Akshita Srivastava | Some screens need clearer direction. | Added a contextual next step from plan creation to checkout demo. | [`058ccf6`](https://github.com/RAJIV81205/invoq/commit/058ccf6c32fb877cc396fe53df92de9c55896463) |
+| Vardhaann Rathore | Experience still feels rough. | Added consistent keyboard focus and touch interaction feedback. | [`ab69833`](https://github.com/RAJIV81205/invoq/commit/ab698332940e8bb07122a63412fe85c5d1c4af55) |
+| Srinadh Ghantasala | Add a better status message. | Added persistent setup-required/plan-verified checkout status. | [`c28f117`](https://github.com/RAJIV81205/invoq/commit/c28f11799b9983abd40b92ab920c2fdd8dc631be) |
 
 ## Deployment order
 
